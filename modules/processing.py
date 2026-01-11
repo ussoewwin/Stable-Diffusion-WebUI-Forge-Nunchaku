@@ -10,22 +10,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any
 
-# NumPy 2.2.6 compatibility shim for opencv-python
 import numpy as np
-try:
-    # Ensure _ARRAY_API exists for opencv-python compatibility
-    if not hasattr(np.core.multiarray, '_ARRAY_API'):
-        try:
-            from numpy.core import _multiarray_umath
-            if hasattr(_multiarray_umath, '_ARRAY_API'):
-                np.core.multiarray._ARRAY_API = _multiarray_umath._ARRAY_API
-        except (ImportError, AttributeError):
-            # Fallback: create minimal stub if needed
-            if not hasattr(np.core.multiarray, '_ARRAY_API'):
-                np.core.multiarray._ARRAY_API = None
-except (ImportError, AttributeError):
-    pass
-
 import cv2
 import torch
 from einops import repeat
