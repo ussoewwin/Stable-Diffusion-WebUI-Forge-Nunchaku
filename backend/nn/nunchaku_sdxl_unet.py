@@ -2241,11 +2241,11 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
         input_dtype = x.dtype
         
         # Nunchaku SDXL UNet uses bfloat16 internally
-        # Convert inputs to match UNet dtype to avoid dtype mismatch errors
+        # Convert inputs to match UNet dtype and device to avoid dtype/device mismatch errors
         unet_dtype = self.dtype  # bfloat16 by default
-        x = x.to(dtype=unet_dtype)
-        context = context.to(dtype=unet_dtype) if context is not None else None
-        timesteps = timesteps.to(dtype=unet_dtype) if timesteps.dtype.is_floating_point else timesteps
+        x = x.to(device=device, dtype=unet_dtype)
+        context = context.to(device=device, dtype=unet_dtype) if context is not None else None
+        timesteps = timesteps.to(device=device, dtype=unet_dtype) if timesteps.dtype.is_floating_point else timesteps.to(device=device)
 
         # Build added_cond_kwargs for SDXL
         # Forge Neo format for y (vector):
@@ -2434,8 +2434,8 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
         else:
             result = output
 
-        # Convert back to original input dtype (float16) for compatibility with rest of pipeline
-        return result.to(dtype=input_dtype)
+        # Convert back to original input dtype (float16) and device for compatibility with rest of pipeline
+        return result.to(device=device, dtype=input_dtype)
 
     def load_state_dict(self, sd, *args, **kwargs):
         """Build and load the model from state dict."""

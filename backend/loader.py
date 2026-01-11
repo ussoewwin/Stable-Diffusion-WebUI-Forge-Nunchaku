@@ -15,7 +15,6 @@ from backend.diffusion_engine.lumina import Lumina2
 from backend.diffusion_engine.qwen import QwenImage
 from backend.diffusion_engine.sd15 import StableDiffusion
 from backend.diffusion_engine.sdxl import StableDiffusionXL, StableDiffusionXLRefiner
-from backend.diffusion_engine.wan import Wan
 from backend.diffusion_engine.zimage import ZImage
 from backend.nn.clip import IntegratedCLIP
 from backend.nn.unet import IntegratedUNet2DConditionModel
@@ -29,7 +28,7 @@ from backend.utils import (
     read_arbitrary_config,
 )
 
-possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, Wan, QwenImage, Lumina2, ZImage]
+possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, QwenImage, Lumina2, ZImage]
 
 
 logging.getLogger("diffusers").setLevel(logging.ERROR)
@@ -227,7 +226,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=["transformer.encoder.embed_tokens.weight", "logit_scale"])
 
             return model
-        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "ChromaTransformer2DModel", "WanTransformer3DModel", "QwenImageTransformer2DModel", "Lumina2Transformer2DModel", "ZImageTransformer2DModel"]:
+        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "ChromaTransformer2DModel", "QwenImageTransformer2DModel", "Lumina2Transformer2DModel", "ZImageTransformer2DModel"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have model state dict!"
 
             model_loader = None
@@ -255,10 +254,6 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 from backend.nn.chroma import IntegratedChromaTransformer2DModel
 
                 model_loader = lambda c: IntegratedChromaTransformer2DModel(**c)
-            elif cls_name == "WanTransformer3DModel":
-                from backend.nn.wan import WanModel
-
-                model_loader = lambda c: WanModel(**c)
             elif cls_name == "QwenImageTransformer2DModel":
                 if guess.nunchaku:
                     from backend.nn.svdq import NunchakuQwenImageTransformer2DModel
@@ -396,7 +391,7 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         asd.clear()
         asd = asd_new
 
-    #   sd / sdxl / wan                  # wan
+    #   sd / sdxl
     if "decoder.conv_in.weight" in asd or "decoder.middle.0.residual.0.gamma" in asd:
         keys_to_delete = [k for k in sd if k.startswith(vae_key_prefix)]
         for k in keys_to_delete:
@@ -706,7 +701,7 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
                          should_convert = True
                      
                      # Safety Net: Explicitly forbid Flux, Qwen, etc. even if they somehow matched SDXL (unlikely but safe)
-                     forbidden = ["FLUX", "QWEN", "CASCADE", "LUMINA", "WAN", "ZIMAGE"]
+                     forbidden = ["FLUX", "QWEN", "CASCADE", "LUMINA", "ZIMAGE"]
                      for f in forbidden:
                          if f in m_type_str or f in repo_str:
                              should_convert = False

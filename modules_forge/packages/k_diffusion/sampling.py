@@ -445,7 +445,7 @@ def sample_dpmpp_sde(model, x, sigmas, extra_args=None, callback=None, disable=N
     extra_args = {} if extra_args is None else extra_args
     sigma_min, sigma_max = sigmas[sigmas > 0].min(), sigmas.max()
     seed = extra_args.get("seed", None)
-    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=True) if noise_sampler is None else noise_sampler
+    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=x.device.type == "cpu") if noise_sampler is None else noise_sampler
     s_in = x.new_ones([x.shape[0]])
 
     model_sampling = model.inner_model.predictor
@@ -531,7 +531,7 @@ def sample_dpmpp_2m_sde(model, x, sigmas, extra_args=None, callback=None, disabl
     extra_args = {} if extra_args is None else extra_args
     seed = extra_args.get("seed", None)
     sigma_min, sigma_max = sigmas[sigmas > 0].min(), sigmas.max()
-    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=True) if noise_sampler is None else noise_sampler
+    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=x.device.type == "cpu") if noise_sampler is None else noise_sampler
     s_in = x.new_ones([x.shape[0]])
 
     model_sampling = model.inner_model.predictor
@@ -583,7 +583,7 @@ def sample_dpmpp_3m_sde(model, x, sigmas, extra_args=None, callback=None, disabl
     extra_args = {} if extra_args is None else extra_args
     seed = extra_args.get("seed", None)
     sigma_min, sigma_max = sigmas[sigmas > 0].min(), sigmas.max()
-    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=True) if noise_sampler is None else noise_sampler
+    noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=x.device.type == "cpu") if noise_sampler is None else noise_sampler
     s_in = x.new_ones([x.shape[0]])
 
     model_sampling = model.inner_model.predictor

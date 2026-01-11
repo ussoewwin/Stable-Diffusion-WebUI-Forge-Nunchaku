@@ -79,31 +79,6 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
 
         return dit_config
 
-    if "{}head.modulation".format(key_prefix) in state_dict_keys:  # Wan 2.1
-        dit_config = {}
-        dit_config["image_model"] = "wan2.1"
-        dim = state_dict["{}head.modulation".format(key_prefix)].shape[-1]
-        out_dim = state_dict["{}head.head.weight".format(key_prefix)].shape[0] // 4
-        dit_config["dim"] = int(dim)
-        dit_config["out_dim"] = int(out_dim)
-        dit_config["num_heads"] = int(dim // 128)
-        dit_config["ffn_dim"] = int(state_dict["{}blocks.0.ffn.0.weight".format(key_prefix)].shape[0])
-        dit_config["num_layers"] = count_blocks(state_dict_keys, "{}blocks.".format(key_prefix) + "{}.")
-        dit_config["patch_size"] = (1, 2, 2)
-        dit_config["freq_dim"] = 256
-        dit_config["window_size"] = (-1, -1)
-        dit_config["qk_norm"] = True
-        dit_config["cross_attn_norm"] = True
-        dit_config["eps"] = 1e-6
-        dit_config["in_dim"] = int(state_dict["{}patch_embedding.weight".format(key_prefix)].shape[1])
-        if "{}img_emb.proj.0.bias".format(key_prefix) in state_dict_keys:
-            dit_config["model_type"] = "i2v"
-        else:
-            dit_config["model_type"] = "t2v"
-        flf_weight = state_dict.get("{}img_emb.emb_pos".format(key_prefix))
-        if flf_weight is not None:
-            dit_config["flf_pos_embed_token_number"] = flf_weight.shape[1]
-        return dit_config
 
     if "{}single_transformer_blocks.0.mlp_fc1.qweight".format(key_prefix) in state_dict_keys:  # SVDQ
         dit_config = {"nunchaku": True}

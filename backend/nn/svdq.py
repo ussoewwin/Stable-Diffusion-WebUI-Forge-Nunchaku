@@ -897,6 +897,12 @@ def patch_z_image_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, t
 def patch_nunchaku_zimage(model: NextDiT, precision: str, rank: int):
     kwargs = {"precision": precision, "rank": rank}
 
+    # Add loras attribute for LoRA support
+    if not hasattr(model, "loras"):
+        model.loras = []
+    if not hasattr(model, "_applied_loras"):
+        model._applied_loras = []
+
     def patch_transformer_block(block_list: list[torch.nn.Module]):
         for _, block in enumerate(block_list):
             block.attention = NunchakuZImageAttention(block.attention, **kwargs)

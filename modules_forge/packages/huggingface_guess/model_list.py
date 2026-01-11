@@ -370,51 +370,6 @@ class ZImage(Lumina2):
         return {"qwen3_4b.transformer": "text_encoder"}
 
 
-class WAN21_T2V(BASE):
-    huggingface_repo = "Wan-AI/Wan2.1-T2V-14B"
-
-    unet_config = {
-        "image_model": "wan2.1",
-        "model_type": "t2v",
-    }
-
-    sampling_settings = {
-        "shift": 8.0,
-    }
-
-    unet_extra_config = {}
-    latent_format = latent.Wan21
-
-    memory_usage_factor = 1.0
-
-    supported_inference_dtypes = [torch.float16, torch.bfloat16, torch.float32]
-
-    vae_key_prefix = ["vae."]
-    text_encoder_key_prefix = ["text_encoders."]
-
-    unet_target = "transformer"
-
-    def __init__(self, unet_config):
-        super().__init__(unet_config)
-        self.memory_usage_factor = self.unet_config.get("dim", 2000) / 2000
-
-    def model_type(self, state_dict):
-        return ModelType.FLOW
-
-    def clip_target(self, state_dict: dict):
-        return {"umt5xxl": "text_encoder"}
-
-
-class WAN21_I2V(WAN21_T2V):
-    huggingface_repo = "Wan-AI/Wan2.1-I2V-14B"
-
-    unet_config = {
-        "image_model": "wan2.1",
-        "model_type": "i2v",
-        "in_dim": 36,
-    }
-
-
 class QwenImage(BASE):
     huggingface_repo = "Qwen/Qwen-Image"
 
@@ -460,7 +415,5 @@ models = [
     Chroma,
     Lumina2,
     ZImage,
-    WAN21_T2V,
-    WAN21_I2V,
     QwenImage,
 ]
