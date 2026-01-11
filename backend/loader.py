@@ -234,7 +234,12 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             _nz = False  # Nunchaku Z-Image
 
             if cls_name == "UNet2DConditionModel":
-                model_loader = lambda c: IntegratedUNet2DConditionModel.from_config(c)
+                if getattr(guess, "nunchaku", False):
+                    from backend.nn.nunchaku_sdxl_unet import SVDQUNet2DConditionModel
+
+                    model_loader = lambda c: SVDQUNet2DConditionModel(c)
+                else:
+                    model_loader = lambda c: IntegratedUNet2DConditionModel.from_config(c)
             elif cls_name == "FluxTransformer2DModel":
                 if guess.nunchaku:
                     from backend.nn.svdq import SVDQFluxTransformer2DModel
@@ -677,6 +682,48 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
         if isinstance(v, list) and len(v) == 2:
             lib_name, cls_name = v
             component_sd = state_dicts.pop(component_name, None)
+            
+            if backend.args.dynamic_args["nunchaku"] and component_name in ["text_encoder", "text_encoder_2"]:
+                 # Nunchaku-SDXL uses a special CLIP format that needs conversion.
+                 # SVDQ Flux and Qwen MUST NOT be converted using SDXL logic.
+                 should_convert = False
+                 try:
+                     m_type_str = ""
+                     if hasattr(estimated_config, "model_type"):
+                         # Handle both Enum and string cases
+                         if hasattr(estimated_config.model_type, "name"):
+                             m_type_str = estimated_config.model_type.name.upper()
+                         else:
+                             m_type_str = str(estimated_config.model_type).upper()
+                     
+                     # Check huggingface_repo as backup or supplementary check
+                     repo_str = str(getattr(estimated_config, "huggingface_repo", "")).upper()
+
+                     # Primary Condition: Must be SDXL
+                     if "SDXL" in m_type_str or "SDXL" in repo_str:
+                         should_convert = True
+                     
+                     # Safety Net: Explicitly forbid Flux, Qwen, etc. even if they somehow matched SDXL (unlikely but safe)
+                     forbidden = ["FLUX", "QWEN", "CASCADE", "LUMINA", "WAN", "ZIMAGE"]
+                     for f in forbidden:
+                         if f in m_type_str or f in repo_str:
+                             should_convert = False
+                             break
+                     
+                     if should_convert:
+                         print(f"[Nunchaku Check] Applying SDXL CLIP conversion for {component_name} (Type: {m_type_str}, Repo: {repo_str})")
+                     else:
+                         # Optional: silent skip or debug log
+                         pass
+
+                 except Exception as e:
+                     print(f"[Nunchaku Check] Error declaring model type: {e}")
+                     should_convert = False
+
+                 if should_convert:
+                     from backend.nn.nunchaku_sdxl_clip import convert_nunchaku_clip_to_forge_format
+                     component_sd = convert_nunchaku_clip_to_forge_format(component_sd, component_name)
+
             component = load_huggingface_component(estimated_config, component_name, lib_name, cls_name, local_path, component_sd)
             if component_sd is not None:
                 del component_sd

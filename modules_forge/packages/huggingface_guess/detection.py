@@ -27,8 +27,16 @@ def calculate_transformer_depth(prefix, state_dict_keys, state_dict):
     transformer_keys = sorted(list(filter(lambda a: a.startswith(transformer_prefix), state_dict_keys)))
     if len(transformer_keys) > 0:
         last_transformer_depth = count_blocks(state_dict_keys, transformer_prefix + "{}")
-        context_dim = state_dict["{}0.attn2.to_k.weight".format(transformer_prefix)].shape[1]
-        use_linear_in_transformer = len(state_dict["{}1.proj_in.weight".format(prefix)].shape) == 2
+        
+        # SVDQ support
+        k_key = "{}0.attn2.to_k.weight".format(transformer_prefix)
+        if k_key not in state_dict:
+            k_key = "{}0.attn2.to_k.qweight".format(transformer_prefix)
+            
+        if k_key in state_dict:
+            context_dim = state_dict[k_key].shape[1]
+        
+        use_linear_in_transformer = len(state_dict.get("{}1.proj_in.weight".format(prefix), state_dict.get("{}1.proj_in.qweight".format(prefix), [])).shape) == 2
         time_stack = "{}1.time_stack.0.attn1.to_q.weight".format(prefix) in state_dict or "{}1.time_mix_blocks.0.attn1.to_q.weight".format(prefix) in state_dict
         time_stack_cross = "{}1.time_stack.0.attn2.to_q.weight".format(prefix) in state_dict or "{}1.time_mix_blocks.0.attn2.to_q.weight".format(prefix) in state_dict
         return last_transformer_depth, context_dim, use_linear_in_transformer, time_stack, time_stack_cross
@@ -159,6 +167,71 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
         dit_config["num_layers"] = count_blocks(state_dict_keys, "{}transformer_blocks.".format(key_prefix) + "{}.")
         return dit_config
 
+    # Nunchaku SDXL (isolated detection)
+    # Robust scan: If we find ANY qweight key, we assume it's Nunchaku to avoid falling back to incompatible logic.
+    is_nunchaku = False
+    for k in state_dict_keys:
+        if k.endswith(".qweight") or k.endswith(".qzeros") or k.endswith(".scales"):
+             is_nunchaku = True
+             break
+             
+    if is_nunchaku:
+        print("[Detection] Detected Nunchaku SDXL (fuzzy qweight match)")
+        # Manually construct SDXL config for Nunchaku
+        unet_config = {
+            "use_checkpoint": False,
+            "image_size": 32,
+            "out_channels": 4,
+            "use_spatial_transformer": True,
+            "legacy": False,
+            "num_classes": "sequential",
+            "adm_in_channels": 2816,
+            "in_channels": 4,
+            "model_channels": 320,
+            "num_res_blocks": [2, 2, 2],
+            "transformer_depth": [0, 0, 2, 2, 10, 10],
+            "channel_mult": [1, 2, 4],
+            "transformer_depth_middle": 10,
+            "use_linear_in_transformer": True,
+            "context_dim": 2048,
+            "num_head_channels": 64,
+            "transformer_depth_output": [0, 0, 0, 2, 2, 2, 10, 10, 10],
+            "use_temporal_attention": False,
+            "use_temporal_resblock": False,
+            "nunchaku": True
+        }
+        return unet_config
+         
+    if is_nunchaku:
+        print("[Detection] Detected Nunchaku SDXL (qweight)")
+        # Manually construct SDXL config for Nunchaku to avoid touching shared fallback logic
+        unet_config = {
+            "use_checkpoint": False,
+            "image_size": 32,
+            "out_channels": 4,
+            "use_spatial_transformer": True,
+            "legacy": False,
+            "num_classes": "sequential",
+            "adm_in_channels": 2816,
+            "in_channels": 4,
+            "model_channels": 320,
+            "num_res_blocks": [2, 2, 2],
+            "transformer_depth": [0, 0, 2, 2, 10, 10],  # Standard SDXL depth
+            "channel_mult": [1, 2, 4],
+            "transformer_depth_middle": 10,
+            "use_linear_in_transformer": True,
+            "context_dim": 2048,
+            "num_head_channels": 64,
+            "transformer_depth_output": [0, 0, 0, 2, 2, 2, 10, 10, 10],
+            "use_temporal_attention": False,
+            "use_temporal_resblock": False,
+            "nunchaku": True # Flag to trigger loader
+        }
+        
+        # SVDQ models might use qweight for conv_in? Or they lack it.
+        # If we return config here, we skip 'unet_config_from_diffusers_unet', avoiding the crash.
+        return unet_config
+
     if "{}input_blocks.0.0.weight".format(key_prefix) not in state_dict_keys:
         return None
 
@@ -168,6 +241,9 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
         "use_spatial_transformer": True,
         "legacy": False,
     }
+    
+    if "{}input_blocks.0.0.qweight".format(key_prefix) in state_dict_keys:
+        unet_config["nunchaku"] = True
 
     y_input = "{}label_emb.0.0.weight".format(key_prefix)
     if y_input in state_dict_keys:
@@ -176,8 +252,8 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
     else:
         unet_config["adm_in_channels"] = None
 
-    model_channels = state_dict["{}input_blocks.0.0.weight".format(key_prefix)].shape[0]
-    in_channels = state_dict["{}input_blocks.0.0.weight".format(key_prefix)].shape[1]
+    model_channels = state_dict.get("{}input_blocks.0.0.weight".format(key_prefix), state_dict.get("{}input_blocks.0.0.qweight".format(key_prefix))).shape[0]
+    in_channels = state_dict.get("{}input_blocks.0.0.weight".format(key_prefix), state_dict.get("{}input_blocks.0.0.qweight".format(key_prefix))).shape[1]
 
     out_key = "{}out.2.weight".format(key_prefix)
     if out_key in state_dict:
@@ -286,7 +362,10 @@ def model_config_from_unet_config(unet_config, state_dict=None):
 def model_config_from_unet(state_dict, unet_key_prefix, use_base_if_no_match=False):
     unet_config = detect_unet_config(state_dict, unet_key_prefix)
     if unet_config is None:
-        return None
+        # Try diffusers format
+        unet_config = unet_config_from_diffusers_unet(state_dict)
+        if unet_config is None:
+            return None
     model_config = model_config_from_unet_config(unet_config, state_dict)
     if model_config is None and use_base_if_no_match:
         return model_list.BASE(unet_config)
@@ -379,7 +458,14 @@ def unet_config_from_diffusers_unet(state_dict, dtype=None):
             )
             transformer_depth.append(transformer_count)
             if transformer_count > 0:
-                match["context_dim"] = state_dict["down_blocks.{}.attentions.{}.transformer_blocks.0.attn2.to_k.weight".format(i, ab)].shape[1]
+                # Check for Nunchaku SDXL (qweight format)
+                nunchaku_key = "down_blocks.{}.attentions.{}.transformer_blocks.0.attn1.to_qkv.qweight".format(i, ab)
+                if nunchaku_key in state_dict:
+                    match["nunchaku"] = True
+                # Get context_dim from attn2.to_k
+                attn2_to_k_key = "down_blocks.{}.attentions.{}.transformer_blocks.0.attn2.to_k.weight".format(i, ab)
+                if attn2_to_k_key in state_dict:
+                    match["context_dim"] = state_dict[attn2_to_k_key].shape[1]
 
         attn_res *= 2
         if attn_blocks == 0:
@@ -395,6 +481,20 @@ def unet_config_from_diffusers_unet(state_dict, dtype=None):
         match["adm_in_channels"] = state_dict["class_embedding.linear_1.weight"].shape[1]
     elif "add_embedding.linear_1.weight" in state_dict:
         match["adm_in_channels"] = state_dict["add_embedding.linear_1.weight"].shape[1]
+
+    # Detect SVDQ (Nunchaku) - fallback check if not detected above
+    if "nunchaku" not in match:
+        if "down_blocks.1.attentions.0.transformer_blocks.0.attn1.to_qkv.qweight" in state_dict:
+            match["nunchaku"] = True
+
+    # If Nunchaku SDXL detected but context_dim not set, try to infer
+    if match.get("nunchaku") and "context_dim" not in match:
+        if match.get("model_channels") == 320:
+            match["context_dim"] = 2048
+
+    # For Nunchaku SDXL: if adm_in_channels is None but model_channels is 320 and context_dim is 2048, set to 2816 (SDXL base)
+    if match.get("nunchaku") and match.get("adm_in_channels") is None and match.get("model_channels") == 320 and match.get("context_dim") == 2048:
+        match["adm_in_channels"] = 2816
 
     SDXL = {
         "use_checkpoint": False,
