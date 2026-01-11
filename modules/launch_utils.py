@@ -253,13 +253,14 @@ def run_extensions_installers(settings_file):
     return
 
 
-re_requirement = re.compile(r"\s*(\S+)\s*==\s*(\S+)\s*")
+re_requirement = re.compile(r"\s*(\S+)\s*(==|>=|>|<=|<)\s*(\S+)\s*")
 
 
 def requirements_met(requirements_file):
     """
     Does a simple parse of a requirements.txt file to determine if all rerqirements in it
     are already installed. Returns True if so, False if not installed or parsing fails.
+    Supports ==, >=, >, <=, < version specifiers.
     """
 
     import importlib.metadata
@@ -275,15 +276,31 @@ def requirements_met(requirements_file):
                 continue
 
             package = m.group(1)
-            version_required = m.group(2)
+            op = m.group(2)
+            version_required = m.group(3)
 
             try:
                 version_installed = importlib.metadata.version(package)
+                installed = packaging.version.parse(version_installed)
+                required = packaging.version.parse(version_required)
             except Exception:
                 return False
 
-            if packaging.version.parse(version_installed) < packaging.version.parse(version_required):
-                return False
+            if op == "==":
+                if installed != required:
+                    return False
+            elif op == ">=":
+                if installed < required:
+                    return False
+            elif op == ">":
+                if installed <= required:
+                    return False
+            elif op == "<=":
+                if installed > required:
+                    return False
+            elif op == "<":
+                if installed >= required:
+                    return False
 
     return True
 
@@ -426,7 +443,7 @@ def prepare_environment():
         requirements_file = os.path.join(script_path, requirements_file)
 
     if not requirements_met(requirements_file):
-        run_pip(f'install -r "{requirements_file}"', "requirements")
+        run_pip(f'install -U -r "{requirements_file}"', "requirements")
         startup_timer.record("install requirements")
 
     if args.onnxruntime_gpu and not is_installed("onnxruntime-gpu"):
@@ -443,7 +460,7 @@ def prepare_environment():
         startup_timer.record("update extensions")
 
     if not requirements_met(requirements_file):
-        run_pip(f'install -r "{requirements_file}"', "requirements")
+        run_pip(f'install -U -r "{requirements_file}"', "requirements")
         startup_timer.record("enforce requirements")
 
     if "--exit" in sys.argv:
