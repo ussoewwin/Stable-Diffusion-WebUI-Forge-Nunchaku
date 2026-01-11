@@ -17,7 +17,6 @@ class PresetArch(Enum):
     flux = 3
     qwen = 4
     lumina = 5
-    wan = 6
 
 
 SAMPLERS = {
@@ -26,7 +25,6 @@ SAMPLERS = {
     PresetArch.flux: "Euler",
     PresetArch.qwen: "LCM",
     PresetArch.lumina: "Res Multistep",
-    PresetArch.wan: "Euler",
 }
 
 SCHEDULERS = {
@@ -35,7 +33,6 @@ SCHEDULERS = {
     PresetArch.flux: "Beta",
     PresetArch.qwen: "Normal",
     PresetArch.lumina: "Linear Quadratic",
-    PresetArch.wan: "Simple",
 }
 
 WIDTH = {
@@ -44,7 +41,6 @@ WIDTH = {
     PresetArch.flux: 896,
     PresetArch.qwen: 896,
     PresetArch.lumina: 1024,
-    PresetArch.wan: 1152,
 }
 
 HEIGHT = {
@@ -53,7 +49,6 @@ HEIGHT = {
     PresetArch.flux: 1152,
     PresetArch.qwen: 1152,
     PresetArch.lumina: 1024,
-    PresetArch.wan: 896,
 }
 
 CFG = {
@@ -62,7 +57,6 @@ CFG = {
     PresetArch.flux: 1.0,
     PresetArch.qwen: 1.0,
     PresetArch.lumina: 4.5,
-    PresetArch.wan: 1.0,
 }
 
 
@@ -136,13 +130,3 @@ def register(options_templates: dict, options_section: Callable, OptionInfo: "Op
         )
     )
 
-    options_templates.update(
-        options_section(
-            ("ui_wan", "WAN", "presets"),
-            {
-                "wan_t2i_d_cfg": OptionInfo(8.0, "txt2img Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
-                "wan_t2i_hr_d_cfg": OptionInfo(8.0, "txt2img Hires. Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
-                "wan_i2i_d_cfg": OptionInfo(8.0, "img2img Shift", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
-            },
-        )
-    )

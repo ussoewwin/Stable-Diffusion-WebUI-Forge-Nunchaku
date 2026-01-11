@@ -131,7 +131,8 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
     current_sd.forge_objects.clip = current_sd.forge_objects_original.clip
 
     if dynamic_args.get("nunchaku", False):
-        current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
+        if hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
+            current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
 
     for filename, strength_model, strength_clip, online_mode in compiled_lora_targets:
         lora_sd = load_lora_state_dict(filename)

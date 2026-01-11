@@ -62,7 +62,7 @@ def make_checkpoint_manager_ui():
         if len(sd_models.checkpoints_list) > 0:
             shared.opts.set("sd_model_checkpoint", next(iter(sd_models.checkpoints_list.values())).name)
 
-    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina", "wan"), elem_id="forge_ui_preset")
+    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina"), elem_id="forge_ui_preset")
 
     ui_checkpoint = gr.Dropdown(label="Checkpoint", value=None, choices=None, elem_id="setting_sd_model_checkpoint", elem_classes=["model_selection"])
 
@@ -307,12 +307,12 @@ def on_preset_change(preset: str):
     if model_mem < 0 or model_mem > total_vram:
         model_mem = total_vram - 1024
 
-    show_clip_skip = preset not in ("qwen", "lumina", "wan")
+    show_clip_skip = preset not in ("qwen", "lumina")
     show_basic_mem = preset != "sd"
-    show_adv_mem = preset in ("flux", "qwen", "wan")
-    distilled = preset in ("flux", "lumina", "wan")
+    show_adv_mem = preset in ("flux", "qwen")
+    distilled = preset in ("flux", "lumina")
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"
-    batch_args = {"minimum": 1, "maximum": 97, "step": 16, "label": "Frames", "value": 1} if preset == "wan" else {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
+    batch_args = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
 
     additional_modules = [os.path.basename(x) for x in getattr(shared.opts, f"forge_additional_modules_{preset}", [])]
 
