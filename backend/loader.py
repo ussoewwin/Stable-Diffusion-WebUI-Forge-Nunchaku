@@ -232,6 +232,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
             model_loader = None
             _nz = False  # Nunchaku Z-Image
+            _nf = False  # Nunchaku Flux (disable Forge operations)
 
             if cls_name == "UNet2DConditionModel":
                 if getattr(guess, "nunchaku", False):
@@ -245,6 +246,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     from backend.nn.svdq import SVDQFluxTransformer2DModel
 
                     model_loader = lambda c: SVDQFluxTransformer2DModel(c)
+                    _nf = True  # Disable Forge operations for Nunchaku Flux
                 else:
                     from backend.nn.flux import IntegratedFluxTransformer2DModel
 
@@ -310,7 +312,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 need_manual_cast = storage_dtype != computation_dtype
                 to_args = dict(device=initial_device, dtype=storage_dtype)
 
-                with using_forge_operations(operations=False if _nz else None, **to_args, manual_cast_enabled=need_manual_cast):
+                with using_forge_operations(operations=False if (_nz or _nf) else None, **to_args, manual_cast_enabled=need_manual_cast):
                     model = model_loader(unet_config).to(**to_args)
 
             if _nz:
