@@ -1,8 +1,8 @@
 <h1 align="center">Stable Diffusion WebUI Forge - Nunchaku</h1>
 
-⚠️ **⚠️ This project is in beta testing and is not ready for general users. ⚠️**
+⚠️ **This project is in beta testing and is not ready for general users.**
 
-⚠️ **This project requires Python 3.13 exclusively. ⚠️**
+⚠️ **This project requires Python 3.13 exclusively.**
 
 ## About
 
