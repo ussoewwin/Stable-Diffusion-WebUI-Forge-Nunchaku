@@ -1,5 +1,9 @@
 <h1 align="center">Stable Diffusion WebUI Forge - Nunchaku</h1>
 
+⚠️ **⚠️ This project is in beta testing and is not ready for general users. ⚠️**
+
+⚠️ **This project requires Python 3.13 exclusively. ⚠️**
+
 ## About
 
 This program is a fork that integrates Nunchaku support into Stable Diffusion WebUI Forge. It is built upon the following repositories:
