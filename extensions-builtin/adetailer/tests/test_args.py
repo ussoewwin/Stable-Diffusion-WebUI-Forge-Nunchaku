@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+import pytest
+
+from adetailer.args import ALL_ARGS, ADetailerArgs
+
+
+def test_all_args() -> None:
+    args = ADetailerArgs()
+    for attr, _ in ALL_ARGS:
+        assert hasattr(args, attr), attr
+
+    for attr, _ in args:
+        if attr == "is_api":
+            continue
+        assert attr in ALL_ARGS.attrs, attr
+
+
+@pytest.mark.parametrize(
+    ("ad_model", "expect"),
+    [("face_yolo11n.pt", False), ("face_yolov8s.pt", False), ("None", True)],
+)
+def test_need_skip(ad_model: str, expect: bool) -> None:
+    args = ADetailerArgs(ad_model=ad_model)
+    assert args.need_skip() is expect
+
+
+@pytest.mark.parametrize(
+    ("ad_model", "ad_tab_enable", "expect"),
+    [
+        ("face_yolo11n.pt", False, True),
+        ("face_yolov8s.pt", False, True),
+        ("None", True, True),
+        ("face_yolo11n.pt", True, False),
+        ("face_yolov8s.pt", True, False),
+    ],
+)
+def test_need_skip_tab_enable(ad_model: str, ad_tab_enable: bool, expect: bool) -> None:
+    args = ADetailerArgs(ad_model=ad_model, ad_tab_enable=ad_tab_enable)
+    assert args.need_skip() is expect

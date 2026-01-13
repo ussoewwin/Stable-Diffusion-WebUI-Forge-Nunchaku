@@ -373,7 +373,7 @@ class Sampler:
 
         sigma_min, sigma_max = sigmas[sigmas > 0].min(), sigmas.max()
         current_iter_seeds = p.all_seeds[p.iteration * p.batch_size : (p.iteration + 1) * p.batch_size]
-        return BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=current_iter_seeds)
+        return BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=current_iter_seeds, cpu=x.device.type == "cpu")
 
     def sample(self, p, x, conditioning, unconditional_conditioning, steps=None, image_conditioning=None):
         raise NotImplementedError()

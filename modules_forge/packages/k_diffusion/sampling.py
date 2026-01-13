@@ -122,12 +122,17 @@ class BrownianTreeNoiseSampler:
 
     def __init__(self, x, sigma_min, sigma_max, seed=None, transform=lambda x: x, cpu=False):
         self.transform = transform
+        self.device = x.device
+        self.dtype = x.dtype
         t0, t1 = self.transform(torch.as_tensor(sigma_min)), self.transform(torch.as_tensor(sigma_max))
         self.tree = BatchedBrownianTree(x, t0, t1, seed, cpu=cpu)
 
     def __call__(self, sigma, sigma_next):
-        t0, t1 = self.transform(torch.as_tensor(sigma)), self.transform(torch.as_tensor(sigma_next))
-        return self.tree(t0, t1) / (t1 - t0).abs().sqrt()
+        t0 = self.transform(torch.as_tensor(sigma)).to(device=self.device, dtype=self.dtype)
+        t1 = self.transform(torch.as_tensor(sigma_next)).to(device=self.device, dtype=self.dtype)
+        result = self.tree(t0, t1)
+        denominator = (t1 - t0).abs().sqrt()
+        return result / denominator
 
 
 def sigma_to_half_log_snr(sigma, model_sampling):
