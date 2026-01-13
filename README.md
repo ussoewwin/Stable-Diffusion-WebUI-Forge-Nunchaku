@@ -24,25 +24,6 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
 ## Changelog
 
-### Version 1.0.6
-
-- **Nunchaku SDXL Loader**
-  - Implemented `SVDQUNet2DConditionModel` for Nunchaku SDXL UNet loading
-  - Automatic model detection via `qweight` format
-  - CLIP text encoder conversion for Nunchaku SDXL format
-  - SVDQ quantization support with bfloat16 precision
-
-- **Nunchaku LoRA Loader**
-  - Runtime LoRA application using forward-add method for quantized UNet
-  - A1111 LoRA format support with automatic key conversion
-  - Multiple LoRAs with individual strength control
-  - Reference: ComfyUI-nunchaku-unofficial-loader v2.1
-
-- **ControlNet Support**
-  - ControlNet signal conversion from Forge Neo format to diffusers format
-  - Full compatibility with Nunchaku SDXL UNet
-  - Reference: ComfyUI-nunchaku-unofficial-loader v2.6
-
 ### Version 1.0.7
 
 - **Added ADetailer as built-in extension**
@@ -51,3 +32,7 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - Includes YOLOv8, YOLOv11, and InsightFace hybrid detection system
   - Fixed ControlNet preprocessor initialization issue
   - Added `extensions-builtin/adetailer/models/` to `.gitignore`
+
+### Version 1.0.6
+
+- Nunchaku SDXL loader, LoRA loader, and ControlNet support completed
