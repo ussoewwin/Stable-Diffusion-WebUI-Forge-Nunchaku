@@ -18,3 +18,17 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
 - **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)**  
   Nunchaku integration reference implementation by [@ussoewwin](https://github.com/ussoewwin)
+
+- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
+  ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
+
+## Changelog
+
+### Version 1.0.7
+
+- **Added ADetailer as built-in extension**
+  - Integrated [ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe) as a standard built-in feature
+  - Python 3.13 compatible with InsightFace instead of MediaPipe
+  - Includes YOLOv8, YOLOv11, and InsightFace hybrid detection system
+  - Fixed ControlNet preprocessor initialization issue
+  - Added `extensions-builtin/adetailer/models/` to `.gitignore`
