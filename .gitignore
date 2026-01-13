@@ -46,3 +46,5 @@ notification.mp3
 random_test.py
 trace.json
 **/tokenizer/tokenizer.json
+/extensions-builtin/adetailer/models/*
+/extensions-builtin/adetailer/models/**

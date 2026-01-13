@@ -1510,6 +1510,7 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
                 x2 = x2.to(device=device)
 
             # Prepare/fuse LoRAs ONCE per (device, dtype, version)
+            # OPTIMIZATION: Precompute fused_weight for single GEMM
             ver = int(getattr(mod, "_runtime_lora_version", 0))
             cache_key = (str(device), str(dtype))
             prepared = getattr(mod, "_runtime_lora_prepared", None)
@@ -1531,13 +1532,13 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
                 # Fuse ranks: down_cat (sum_r, in), up_cat (out, sum_r)
                 down_cat = torch.cat(downs, dim=0).contiguous() if len(downs) > 1 else downs[0]
                 up_cat = torch.cat(ups, dim=1).contiguous() if len(ups) > 1 else ups[0]
-                entry = {"ver": ver, "down": down_cat, "up": up_cat}
+                # ★★★ KEY OPTIMIZATION: Precompute fused weight ★★★
+                fused_weight = (down_cat.T @ up_cat.T).contiguous()  # (in, out)
+                entry = {"ver": ver, "fused_weight": fused_weight}
                 prepared[cache_key] = entry
 
-            down_cat = entry["down"]
-            up_cat = entry["up"]
-            # delta = (x @ down_cat.T) @ up_cat.T
-            delta = (x2.to(dtype=dtype) @ down_cat.T) @ up_cat.T
+            fused_weight = entry["fused_weight"]
+            delta = x2.to(dtype=dtype) @ fused_weight  # ★ Single GEMM ★
 
             if delta is None:
                 return base_out
@@ -1800,6 +1801,7 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
                 x2 = x2.to(device=device)
 
             # Prepare/fuse LoRAs ONCE per (device, dtype, version)
+            # OPTIMIZATION: Precompute fused_weight = down.T @ up.T to reduce 2 GEMMs to 1 GEMM
             ver = int(getattr(mod, "_runtime_lora_version", 0))
             cache_key = (str(device), str(dtype))
             prepared = getattr(mod, "_runtime_lora_prepared", None)
@@ -1819,12 +1821,13 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
                     ups.append(u)
                 down_cat = torch.cat(downs, dim=0).contiguous() if len(downs) > 1 else downs[0]
                 up_cat = torch.cat(ups, dim=1).contiguous() if len(ups) > 1 else ups[0]
-                entry = {"ver": ver, "down": down_cat, "up": up_cat}
+                # ★★★ KEY OPTIMIZATION: Precompute fused weight for single GEMM ★★★
+                fused_weight = (down_cat.T @ up_cat.T).contiguous()  # (in, out)
+                entry = {"ver": ver, "fused_weight": fused_weight}
                 prepared[cache_key] = entry
 
-            down_cat = entry["down"]
-            up_cat = entry["up"]
-            delta = (x2.to(dtype=dtype) @ down_cat.T) @ up_cat.T
+            fused_weight = entry["fused_weight"]
+            delta = x2.to(dtype=dtype) @ fused_weight  # ★ Single GEMM instead of 2 ★
 
             if delta is not None:
                 delta = delta.reshape(*x_shape[:-1], base_out.shape[-1])
