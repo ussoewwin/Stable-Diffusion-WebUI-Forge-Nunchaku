@@ -22,6 +22,20 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
   ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
 
+## Models
+
+### Nunchaku SDXL Models
+
+Nunchaku SDXL models are available from the following repository:
+
+- **[Nunchaku-R128-SDXL-Series](https://huggingface.co/ussoewwin/Nunchaku-R128-SDXL-Series)**  
+  High-fidelity 4-bit quantized SDXL models optimized using Nunchaku (SVDQ W4A4) engine with Rank 128 (r128) for maximum quality preservation.
+
+**Installation:**
+1. Download the `.safetensors` files from the repository
+2. Place them in `models/Stable-diffusion/` directory
+3. The models will be automatically detected and loaded
+
 ## Changelog
 
 ### Version 1.0.7
