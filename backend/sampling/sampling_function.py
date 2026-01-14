@@ -272,7 +272,8 @@ def calc_cond_uncond_batch(model, cond, uncond, x_in, timestep, model_options):
                 p.transformer_options = transformer_options
                 p = p.previous_controlnet
             control_cond = c.copy()  # get_control may change items in this dict, so we need to copy it
-            c["control"] = control.get_control(input_x, timestep_, control_cond, len(cond_or_uncond))
+            # ComfyUI標準のget_control()は5つの引数を取る: (x_noisy, t, cond, batched_number, transformer_options)
+            c["control"] = control.get_control(input_x, timestep_, control_cond, len(cond_or_uncond), transformer_options)
             c["control_model"] = control
 
         if "model_function_wrapper" in model_options:

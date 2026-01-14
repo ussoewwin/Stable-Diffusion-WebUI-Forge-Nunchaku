@@ -280,7 +280,7 @@ class ControlNet(ControlBase):
         self.model_sampling_current = None
         self.manual_cast_dtype = manual_cast_dtype
 
-    def get_control(self, x_noisy, t, cond, batched_number):
+    def get_control(self, x_noisy, t, cond, batched_number, transformer_options=None):
         to = self.transformer_options
 
         for conditioning_modifier in to.get("controlnet_conditioning_modifiers", []):
