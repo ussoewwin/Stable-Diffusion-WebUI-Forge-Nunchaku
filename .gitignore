@@ -48,3 +48,4 @@ trace.json
 **/tokenizer/tokenizer.json
 /extensions-builtin/adetailer/models/*
 /extensions-builtin/adetailer/models/**
+/docs/

@@ -10,6 +10,46 @@ from backend.patcher.controlnet import ControlLora, ControlNet, load_t2i_adapter
 from modules_forge.shared import add_supported_control_model
 
 
+# =============================================================================
+# ComfyUI ControlNet patches for Forge compatibility
+# Forge calls get_control with 6 args (including transformer_options)
+# but ComfyUI standard ControlNet.get_control only takes 5 args
+# =============================================================================
+try:
+    import sys
+    comfy_path = r"D:\USERFILES\ComfyUI\ComfyUI"
+    if comfy_path not in sys.path:
+        sys.path.insert(0, comfy_path)
+    import comfy.controlnet
+    
+    # Patch ControlNet.get_control
+    _original_controlnet_get_control = comfy.controlnet.ControlNet.get_control
+    
+    def _patched_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options=None):
+        """Patched get_control that accepts transformer_options for Forge compatibility."""
+        try:
+            return _original_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options)
+        except TypeError:
+            return _original_controlnet_get_control(self, x_noisy, t, cond, batched_number)
+    
+    comfy.controlnet.ControlNet.get_control = _patched_controlnet_get_control
+    
+    # Patch T2IAdapter.get_control
+    if hasattr(comfy.controlnet, "T2IAdapter"):
+        _original_t2i_get_control = comfy.controlnet.T2IAdapter.get_control
+        
+        def _patched_t2i_get_control(self, x_noisy, t, cond, batched_number, transformer_options=None):
+            try:
+                return _original_t2i_get_control(self, x_noisy, t, cond, batched_number, transformer_options)
+            except TypeError:
+                return _original_t2i_get_control(self, x_noisy, t, cond, batched_number)
+        
+        comfy.controlnet.T2IAdapter.get_control = _patched_t2i_get_control
+except ImportError:
+    pass  # ComfyUI not available, patches not needed
+
+
+
 class ControlModelPatcher:
     @staticmethod
     def try_build_from_state_dict(state_dict, ckpt_path):
@@ -39,6 +79,15 @@ class ControlModelPatcher:
 class ControlNetPatcher(ControlModelPatcher):
     @staticmethod
     def try_build_from_state_dict(controlnet_data, ckpt_path):
+        # Flux ControlNet (InstantX format)
+        if "controlnet_x_embedder.weight" in controlnet_data:
+            try:
+                from modules_forge.supported_controlnet_flux import FluxControlNetPatcher
+                return FluxControlNetPatcher.try_build_from_state_dict(controlnet_data, ckpt_path)
+            except Exception as e:
+                print(f"Failed to load Flux ControlNet: {e}")
+                return None
+        
         if "lora_controlnet" in controlnet_data:
             return ControlNetPatcher(ControlLora(controlnet_data))
 
