@@ -156,3 +156,12 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 ### Version 1.0.6
 
 - Nunchaku SDXL loader, LoRA loader, and ControlNet support completed
+
+## License
+
+This project is licensed under the following licenses:
+
+- **AGPL-3.0** - GNU Affero General Public License v3.0
+- **Apache 2.0** - Apache License 2.0
+
+See [LICENSE](LICENSE) file for details.
