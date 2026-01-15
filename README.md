@@ -72,6 +72,15 @@ Nunchaku SDXL models are available from the following repository:
 
 ## Changelog
 
+### Version 1.1.0
+
+- **Added Union ControlNet support for Flux1 and Nunchaku Flux1**
+  - Full Union ControlNet support for both Flux1 and Nunchaku Flux1 models
+  - Multiple ControlNet models can be used simultaneously
+  - Automatic model detection via `controlnet_x_embedder.weight` key
+  - VAE wrapper for seamless Forge VAE integration
+  - See [Release Notes](docs/RELEASES.md#v110) for details
+
 ### Version 1.0.7
 
 - **Added ADetailer as built-in extension**
