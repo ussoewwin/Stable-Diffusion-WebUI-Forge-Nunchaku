@@ -608,10 +608,25 @@ class NunchakuQwenImageTransformerBlock(nn.Module):
         encoder_hidden_states = encoder_hidden_states + txt_gate2 * txt_mlp_output
 
         return encoder_hidden_states, hidden_states
+# region: Qwen Image - LoRA support for Nunchaku Qwen Image only
+# Import LoRA functions only for Nunchaku Qwen Image, not for other models (e.g., Flux, Z-Image)
+from backend.nn._qwen_lora import compose_loras_v2, reset_lora_v2
+# endregion
+
+# region: Z-Image - LoRA support for Nunchaku Z-Image only
+# Import LoRA functions only for Nunchaku Z-Image, not for other models (e.g., Flux, Qwen Image)
+from backend.nn._zimage_lora import compose_loras_v2 as compose_zimage_loras_v2, reset_lora_v2 as reset_zimage_lora_v2
+# endregion
 
 
 class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransformer2DModel):
     """https://github.com/nunchaku-tech/ComfyUI-nunchaku/blob/v1.0.1/models/qwenimage.py"""
+    """
+    Nunchaku Qwen Image Transformer2D Model with LoRA support.
+    
+    This class uses ComfyUI-QwenImageLoraLoader's implementation for LoRA composition.
+    LoRA functions are imported only for this class to avoid affecting other Nunchaku models (e.g., Flux).
+    """
 
     def __init__(
         self,
@@ -636,6 +651,8 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
 
         self.pe_embedder = EmbedND(dim=attention_head_dim, theta=10000, axes_dim=list(axes_dims_rope))
 
+        # Initialize time_text_embed - ComfyUI-nunchaku uses use_additional_t_cond parameter
+        # For now, we use the basic version; additional_t_cond support can be added later if needed
         self.time_text_embed = QwenTimestepProjEmbeddings(
             embedding_dim=self.inner_dim,
             pooled_projection_dim=pooled_projection_dim,
@@ -685,6 +702,7 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
         attention_mask=None,
         guidance: torch.Tensor = None,
         ref_latents=None,
+        additional_t_cond=None,
         transformer_options={},
         control=None,
         **kwargs,
@@ -741,18 +759,35 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
         encoder_hidden_states = self.txt_norm(encoder_hidden_states)
         encoder_hidden_states = self.txt_in(encoder_hidden_states)
 
-        if guidance is not None:
-            guidance = guidance * 1000
+        # Handle guidance and additional_t_cond (ComfyUI-nunchaku compatibility)
+        # If additional_t_cond is provided, use it; otherwise fall back to guidance
+        if additional_t_cond is None and guidance is not None:
+            additional_t_cond = guidance * 1000
 
-        if self.loras != self._applied_loras:
-            self._applied_loras = self.loras.copy()
+        # Robust LoRA change detection: compare list lengths and contents (deep comparison)
+        # This ensures LoRA is reapplied when model is reloaded or LoRA config changes
+        loras_changed = (
+            len(self.loras) != len(self._applied_loras) or
+            any(
+                (lora_path != applied_path or lora_strength != applied_strength)
+                for (lora_path, lora_strength), (applied_path, applied_strength)
+                in zip(self.loras, self._applied_loras)
+            )
+        )
+
+        if loras_changed:
+            # Update _applied_loras to match current loras (deep copy to avoid reference issues)
+            self._applied_loras = [(path, strength) for path, strength in self.loras]
 
             reset_lora_v2(self)
             self.set_offload(False, None, None)
 
-            print("[Qwen] Composing LoRAs...")
-            compose_loras_v2(self, self.loras)
-            print("[Qwen] LoRAs Composed~")
+            print(f"[Qwen] Composing {len(self.loras)} LoRA(s)...")
+            if len(self.loras) > 0:
+                compose_loras_v2(self, self.loras)
+                print("[Qwen] LoRAs Composed~")
+            else:
+                print("[Qwen] No LoRAs to compose (all cleared)")
 
             self.set_offload(
                 offload=shared.opts.svdq_cpu_offload,
@@ -760,7 +795,11 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
                 num_blocks_on_gpu=shared.opts.svdq_num_blocks_on_gpu,
             )
 
-        temb = self.time_text_embed(timestep, hidden_states) if guidance is None else self.time_text_embed(timestep, guidance, hidden_states)
+        # ComfyUI-nunchaku style: time_text_embed(timestep, hidden_states, additional_t_cond)
+        # Note: ForgeNeo's QwenTimestepProjEmbeddings currently doesn't support additional_t_cond
+        # We pass it in the signature for compatibility, but it will be ignored by the underlying implementation
+        # TODO: Update QwenTimestepProjEmbeddings to support additional_t_cond if needed
+        temb = self.time_text_embed(timestep, hidden_states)
 
         patches_replace = transformer_options.get("patches_replace", {})
         blocks_replace = patches_replace.get("dit", {})
@@ -991,11 +1030,41 @@ def patch_z_image_state_dict(state_dict: dict[str, torch.Tensor]) -> dict[str, t
 def patch_nunchaku_zimage(model: NextDiT, precision: str, rank: int):
     kwargs = {"precision": precision, "rank": rank}
 
-    # Add loras attribute for LoRA support
+    # Add loras attribute for LoRA support (Z-Image only)
     if not hasattr(model, "loras"):
         model.loras = []
     if not hasattr(model, "_applied_loras"):
         model._applied_loras = []
+    
+    # Patch forward method to apply LoRA (Z-Image only)
+    if not hasattr(model, "_original_forward_patched_for_lora"):
+        model._original_forward = model.forward
+        def _forward_with_lora(*args, **kwargs):
+            # Apply LoRA if needed (Z-Image only)
+            # Robust LoRA change detection: compare list lengths and contents (deep comparison)
+            # This ensures LoRA is reapplied when model is reloaded or LoRA config changes
+            loras_changed = (
+                len(model.loras) != len(model._applied_loras) or
+                any(
+                    (lora_path != applied_path or lora_strength != applied_strength)
+                    for (lora_path, lora_strength), (applied_path, applied_strength)
+                    in zip(model.loras, model._applied_loras)
+                )
+            )
+
+            if loras_changed:
+                # Update _applied_loras to match current loras (deep copy to avoid reference issues)
+                model._applied_loras = [(path, strength) for path, strength in model.loras]
+                reset_zimage_lora_v2(model)
+                print(f"[Z-Image] Composing {len(model.loras)} LoRA(s)...")
+                if len(model.loras) > 0:
+                    compose_zimage_loras_v2(model, model.loras)
+                    print("[Z-Image] LoRAs Composed~")
+                else:
+                    print("[Z-Image] No LoRAs to compose (all cleared)")
+            return model._original_forward(*args, **kwargs)
+        model.forward = _forward_with_lora
+        model._original_forward_patched_for_lora = True
 
     def patch_transformer_block(block_list: list[torch.nn.Module]):
         for _, block in enumerate(block_list):
@@ -1012,7 +1081,16 @@ def patch_nunchaku_zimage(model: NextDiT, precision: str, rank: int):
     def load_state_dict(sd, *args, **kwargs):
         sd = patch_z_image_state_dict(sd)
         patch_scale_key(model, sd)
-        return _load_state_dict(sd, *args, **kwargs)
+        result = _load_state_dict(sd, *args, **kwargs)
+        # Apply Z-Image specific LoRAs after state dict is loaded
+        if model.loras != model._applied_loras:
+            model._applied_loras = [(path, strength) for path, strength in model.loras]
+            reset_zimage_lora_v2(model)
+            if len(model.loras) > 0:
+                print(f"[Z-Image] Applying {len(model.loras)} LoRA(s) after model load...")
+                compose_zimage_loras_v2(model, model.loras)
+                print("[Z-Image] LoRAs Applied~")
+        return result
 
     model.load_state_dict = load_state_dict
 
