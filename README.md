@@ -133,7 +133,7 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
   - Robust change detection to handle model reloads correctly
   - Support for standard LoRA formats (lora_A/lora_B, lora_up/lora_down)
   - AWQ quantization layer handling with safety switch
-  - See [Release Notes](docs/RELEASE_NOTES_v1.2.0.md) for details
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.2.0) for details
 
 ### Version 1.1.0
 
@@ -142,7 +142,7 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
   - Multiple ControlNet models can be used simultaneously
   - Automatic model detection via `controlnet_x_embedder.weight` key
   - VAE wrapper for seamless Forge VAE integration
-  - See [Release Notes](docs/RELEASE_NOTES_v1.1.0.md) for details
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.1.0) for details
 
 ### Version 1.0.7
 
