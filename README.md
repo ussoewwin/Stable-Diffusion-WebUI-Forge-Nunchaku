@@ -35,8 +35,6 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 - **Union ControlNet for Flux1**
   - ✅ **Union ControlNet support for both Flux1 and Nunchaku Flux1 models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
-  - Compatible with ComfyUI ControlNet ecosystem
-  - **Fully self-contained** - No external ComfyUI installation required
   - Supports Flux Union ControlNet models (e.g., `flux_shakker_labs_union_pro-2-fp8.safetensors`)
   - Automatic model detection and loading via `controlnet_x_embedder.weight` key detection
   - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
