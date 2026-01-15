@@ -33,6 +33,15 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - LoRA loader support for Nunchaku SDXL models
   - ControlNet support for Nunchaku SDXL models
 
+- **LoRA Support for Nunchaku Qwen Image and Z-Image**
+  - ✅ **Full LoRA support for Nunchaku Qwen Image (QI) models**
+  - ✅ **Full LoRA support for Nunchaku Z-Image (ZIT) models**
+  - Completely separated implementations for Qwen Image and Z-Image
+  - Support for standard LoRA formats (lora_A/lora_B, lora_up/lora_down)
+  - Comprehensive logging with format detection for all LoRAs
+  - Robust change detection to handle model reloads correctly
+  - AWQ quantization layer handling with safety switch
+
 - **Union ControlNet for Flux1 and Nunchaku Flux1**
   - ✅ **Union ControlNet support for both Flux1 and Nunchaku Flux1 models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
