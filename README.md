@@ -72,6 +72,18 @@ Nunchaku SDXL models are available from the following repository:
 
 ## Changelog
 
+### Version 1.2.0
+
+- **Added LoRA support for Nunchaku Qwen Image and Z-Image models**
+  - Full LoRA support for Nunchaku Qwen Image (QI) models
+  - Full LoRA support for Nunchaku Z-Image (ZIT) models
+  - Completely separated implementations for Qwen Image and Z-Image
+  - Comprehensive logging with format detection for all LoRAs
+  - Robust change detection to handle model reloads correctly
+  - Support for standard LoRA formats (lora_A/lora_B, lora_up/lora_down)
+  - AWQ quantization layer handling with safety switch
+  - See [Release Notes](docs/RELEASE_NOTES_v1.2.0.md) for details
+
 ### Version 1.1.0
 
 - **Added Union ControlNet support for Flux1 and Nunchaku Flux1**
@@ -79,7 +91,7 @@ Nunchaku SDXL models are available from the following repository:
   - Multiple ControlNet models can be used simultaneously
   - Automatic model detection via `controlnet_x_embedder.weight` key
   - VAE wrapper for seamless Forge VAE integration
-  - See [Release Notes](docs/RELEASES.md#v110) for details
+  - See [Release Notes](docs/RELEASE_NOTES_v1.1.0.md) for details
 
 ### Version 1.0.7
 
