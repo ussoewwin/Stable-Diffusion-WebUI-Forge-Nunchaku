@@ -12,17 +12,12 @@ from modules_forge.shared import add_supported_control_model
 
 # =============================================================================
 # ComfyUI ControlNet patches for Forge compatibility
-# Forge calls get_control with 6 args (including transformer_options)
-# but ComfyUI standard ControlNet.get_control only takes 5 args
+# Uses Forge's bundled comfy package (no external ComfyUI required)
 # =============================================================================
 try:
-    import sys
-    comfy_path = r"D:\USERFILES\ComfyUI\ComfyUI"
-    if comfy_path not in sys.path:
-        sys.path.insert(0, comfy_path)
     import comfy.controlnet
     
-    # Patch ControlNet.get_control
+    # Patch ControlNet.get_control for transformer_options compatibility
     _original_controlnet_get_control = comfy.controlnet.ControlNet.get_control
     
     def _patched_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options=None):
@@ -34,7 +29,7 @@ try:
     
     comfy.controlnet.ControlNet.get_control = _patched_controlnet_get_control
     
-    # Patch T2IAdapter.get_control
+    # Patch T2IAdapter.get_control if available
     if hasattr(comfy.controlnet, "T2IAdapter"):
         _original_t2i_get_control = comfy.controlnet.T2IAdapter.get_control
         
@@ -46,7 +41,7 @@ try:
         
         comfy.controlnet.T2IAdapter.get_control = _patched_t2i_get_control
 except ImportError:
-    pass  # ComfyUI not available, patches not needed
+    pass  # comfy.controlnet not available
 
 
 

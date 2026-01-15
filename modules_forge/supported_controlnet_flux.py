@@ -1,23 +1,15 @@
 """
-Flux ControlNet support for Forge (Nunchaku SVDQ).
-This module handles the integration of ComfyUI's ControlNet system with Forge's
-SVDQFluxTransformer2DModel.
+Flux ControlNet support for Forge.
+This module handles the integration of Flux ControlNet with Forge's
+SVDQFluxTransformer2DModel and IntegratedFluxTransformer2DModel.
+
+Uses Forge's bundled ComfyUI package (no external ComfyUI installation required).
 """
 
-import os
-import sys
 import torch
 
-# ComfyUI標準のControlNetシステムを使用するため、ComfyUIへのパスを追加
-comfy_path = r"D:\USERFILES\ComfyUI\ComfyUI"
-if comfy_path not in sys.path:
-    sys.path.insert(0, comfy_path)
-
+# Use Forge's bundled comfy package (located at repository root)
 import comfy.controlnet
-import comfy.model_detection
-import comfy.utils
-import comfy.model_management
-import comfy.model_base
 from modules_forge.supported_controlnet import ControlModelPatcher
 
 
@@ -74,10 +66,10 @@ class FluxControlNetPatcher(ControlModelPatcher):
     def try_build_from_state_dict(controlnet_data, ckpt_path):
         """
         Attempt to load a Flux ControlNet from state dict.
-        Uses ComfyUI's standard load_controlnet_state_dict function.
+        Uses Forge's bundled comfy.controlnet loader.
         """
         try:
-            # Use ComfyUI's standard loader which handles Diffusers format conversion
+            # Use Forge's bundled loader which handles Diffusers format conversion
             control = comfy.controlnet.load_controlnet_state_dict(controlnet_data)
             
             if control is None:
@@ -113,26 +105,35 @@ class FluxControlNetPatcher(ControlModelPatcher):
 
     def process_before_every_sampling(self, process, cond, mask, *args, **kwargs):
         """
-        Set up ControlNet for Nunchaku Flux1 sampling.
+        Set up ControlNet for Flux1 sampling.
         
         This method:
-        1. Verifies the model is a Nunchaku Flux1 model
+        1. Verifies the model is a Flux1 model (Nunchaku or standard)
         2. Wraps the VAE for ComfyUI compatibility
         3. Sets up the ControlNet linked list
         """
         unet = process.sd_model.forge_objects.unet
         
-        # Verify this is a Nunchaku Flux1 model
+        # Check for Flux1 models (both Nunchaku and standard)
         from backend.nn.svdq import SVDQFluxTransformer2DModel
-        is_nunchaku_flux1 = False
-        if hasattr(unet, 'model') and hasattr(unet.model, 'diffusion_model'):
-            is_nunchaku_flux1 = isinstance(unet.model.diffusion_model, SVDQFluxTransformer2DModel)
+        from backend.nn.flux import IntegratedFluxTransformer2DModel
         
-        if not is_nunchaku_flux1:
-            print("[FluxControlNet] WARNING: This ControlNet is designed for Nunchaku Flux1 only!")
+        is_flux1 = False
+        flux_type = None
+        if hasattr(unet, 'model') and hasattr(unet.model, 'diffusion_model'):
+            diffusion_model = unet.model.diffusion_model
+            if isinstance(diffusion_model, SVDQFluxTransformer2DModel):
+                is_flux1 = True
+                flux_type = "Nunchaku"
+            elif isinstance(diffusion_model, IntegratedFluxTransformer2DModel):
+                is_flux1 = True
+                flux_type = "Standard"
+        
+        if not is_flux1:
+            print("[FluxControlNet] WARNING: This ControlNet is designed for Flux1 models only!")
             return
         
-        print(f"[FluxControlNet] Processing ControlNet for Nunchaku Flux1")
+        print(f"[FluxControlNet] Processing ControlNet for {flux_type} Flux1")
         print(f"[FluxControlNet] Strength: {self.strength}, Range: {self.start_percent}-{self.end_percent}")
         
         # Get and wrap VAE

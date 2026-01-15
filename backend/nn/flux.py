@@ -372,7 +372,8 @@ class IntegratedFluxTransformer2DModel(nn.Module):
 
         self.final_layer = LastLayer(self.hidden_size, 1, self.out_channels)
 
-    def inner_forward(self, img, img_ids, txt, txt_ids, timesteps, y, guidance=None):
+    def inner_forward(self, img, img_ids, txt, txt_ids, timesteps, y, guidance=None, 
+                       controlnet_block_samples=None, controlnet_single_block_samples=None):
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
         img = self.img_in(img)
@@ -388,11 +389,23 @@ class IntegratedFluxTransformer2DModel(nn.Module):
         del txt_ids, img_ids
         pe = self.pe_embedder(ids)
         del ids
-        for block in self.double_blocks:
+        
+        # Double blocks with ControlNet injection
+        for i, block in enumerate(self.double_blocks):
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
+            # Add ControlNet signal for double blocks (input signals)
+            if controlnet_block_samples is not None and i < len(controlnet_block_samples):
+                img = img + controlnet_block_samples[i].to(img.dtype)
+        
         img = torch.cat((txt, img), 1)
-        for block in self.single_blocks:
+        
+        # Single blocks with ControlNet injection
+        for i, block in enumerate(self.single_blocks):
             img = block(img, vec=vec, pe=pe)
+            # Add ControlNet signal for single blocks (output signals)
+            if controlnet_single_block_samples is not None and i < len(controlnet_single_block_samples):
+                img = img + controlnet_single_block_samples[i].to(img.dtype)
+        
         del pe
         img = img[:, txt.shape[1] :, ...]
         del txt
@@ -429,7 +442,18 @@ class IntegratedFluxTransformer2DModel(nn.Module):
 
         txt_ids = torch.zeros((bs, context.shape[1], 3), device=x.device, dtype=x.dtype)
 
-        out = self.inner_forward(img, img_ids, context, txt_ids, timestep, y, guidance)
+        # Extract ControlNet signals
+        controlnet_block_samples = None
+        controlnet_single_block_samples = None
+        if control is not None:
+            controlnet_block_samples = [s.to(x.dtype) for s in control.get("input", [])]
+            controlnet_single_block_samples = [s.to(x.dtype) for s in control.get("output", [])]
+            if controlnet_block_samples:
+                print(f"[StandardFlux1] ControlNet: {len(controlnet_block_samples)} double block signals, {len(controlnet_single_block_samples)} single block signals")
+
+        out = self.inner_forward(img, img_ids, context, txt_ids, timestep, y, guidance,
+                                  controlnet_block_samples=controlnet_block_samples,
+                                  controlnet_single_block_samples=controlnet_single_block_samples)
         del img, img_ids, txt_ids, timestep, context
         out = out[:, :img_tokens]
         out = rearrange(out, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=h_len, w=w_len, ph=self.patch_size, pw=self.patch_size)
