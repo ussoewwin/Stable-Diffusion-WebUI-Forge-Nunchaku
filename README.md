@@ -22,6 +22,47 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
   ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
 
+## Features
+
+### 🎯 Key Features
+
+- **Flux1 & Nunchaku Flux1 Support**
+  - Full support for Flux1 and Nunchaku Flux1 models
+  - Optimized 4-bit quantized models with SVDQ W4A4 engine (Rank 128)
+  - High-quality image generation with reduced memory footprint
+  - Both Nunchaku SVDQ (`SVDQFluxTransformer2DModel`) and standard Flux1 (`IntegratedFluxTransformer2DModel`) architectures supported
+
+- **Union ControlNet for Flux1**
+  - ✅ **Union ControlNet support for both Flux1 and Nunchaku Flux1 models**
+  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
+  - Compatible with ComfyUI ControlNet ecosystem
+  - **Fully self-contained** - No external ComfyUI installation required
+  - Supports Flux Union ControlNet models (e.g., `flux_shakker_labs_union_pro-2-fp8.safetensors`)
+  - Automatic model detection and loading via `controlnet_x_embedder.weight` key detection
+  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+
+  <img src="png/f1cn.png" alt="Flux1 ControlNet Union" width="400">
+
+  *Flux1 Union ControlNet workflow example*
+
+- **Built-in ADetailer**
+  - Python 3.13 compatible face detection and enhancement
+  - YOLOv8, YOLOv11, and InsightFace hybrid detection system
+  - Enhanced face detection accuracy with complementary detection
+  - Automatic model download and management
+  - SDXL/Pony optimized detection thresholds
+
+- **ComfyUI Integration (Self-Contained)**
+  - Full ComfyUI modules integrated without external dependencies
+  - ComfyUI ControlNet system fully embedded
+  - ComfyUI LDM (Latent Diffusion Models) support
+  - Node helpers for ControlNet compatibility
+
+- **Python 3.13 Exclusive**
+  - Latest Python features and performance improvements
+  - Optimized for modern hardware and workflows
+  - Future-proof architecture
+
 ## Models
 
 ### Nunchaku SDXL Models
