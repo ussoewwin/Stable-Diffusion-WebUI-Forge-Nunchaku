@@ -26,6 +26,13 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
 ### 🎯 Key Features
 
+- **Nunchaku SDXL Support**
+  - Full support for Nunchaku SDXL models with LoRA and ControlNet
+  - Optimized 4-bit quantized SDXL models with SVDQ W4A4 engine (Rank 128)
+  - Automatic model detection and loading
+  - LoRA loader support for Nunchaku SDXL models
+  - ControlNet support for Nunchaku SDXL models
+
 - **Union ControlNet for Flux1 and Nunchaku Flux1**
   - ✅ **Union ControlNet support for both Flux1 and Nunchaku Flux1 models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
