@@ -169,6 +169,9 @@ This project is built upon the following repositories:
 - **[sd-webui-forge-classic (neo branch)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)**  
   Classic Forge implementation by [@Haoming02](https://github.com/Haoming02)
 
+- **[ComfyUI](https://github.com/Comfy-Org/ComfyUI)**  
+  The most powerful and modular diffusion model GUI, API and backend with a graph/nodes interface by [@Comfy-Org](https://github.com/Comfy-Org)
+
 - **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)**  
   Nunchaku integration reference implementation by [@ussoewwin](https://github.com/ussoewwin)
 
