@@ -99,18 +99,31 @@ class KModel(torch.nn.Module):
         if config is not None and hasattr(config, "model_type"):
             model_type = config.model_type
             if hasattr(model_type, "name"):
+                import comfy.model_base
+                from comfy.model_base import ModelType
                 if model_type.name == "FLUX":
                     self.model_sampling = ModelSamplingFluxWithConst(config)
                 elif model_type.name == "FLOW":
                     # Qwen Image uses ModelType.FLOW
                     # Use ComfyUI's model_sampling function to create the correct ModelSampling class
-                    import comfy.model_base
-                    # Convert model_type.name to ModelType Enum
-                    from comfy.model_base import ModelType
                     model_type_enum = ModelType.FLOW
                     self.model_sampling = comfy.model_base.model_sampling(config, model_type_enum)
+                elif model_type.name == "EPS":
+                    # SDXL and other EPS models use ModelType.EPS
+                    # Use ComfyUI's model_sampling function to create the correct ModelSampling class
+                    model_type_enum = ModelType.EPS
+                    self.model_sampling = comfy.model_base.model_sampling(config, model_type_enum)
                 else:
-                    self.model_sampling = None
+                    # For other model types, try to use ComfyUI's model_sampling function
+                    # This handles V_PREDICTION, V_PREDICTION_EDM, STABLE_CASCADE, EDM, etc.
+                    try:
+                        model_type_enum = getattr(ModelType, model_type.name, None)
+                        if model_type_enum is not None:
+                            self.model_sampling = comfy.model_base.model_sampling(config, model_type_enum)
+                        else:
+                            self.model_sampling = None
+                    except (AttributeError, TypeError):
+                        self.model_sampling = None
             else:
                 self.model_sampling = None
         else:

@@ -61,6 +61,8 @@ class RK_Method_Beta:
         model_sampling_path = None
         is_nunchaku_qwen_image = False
         is_nunchaku_flux1 = False
+        is_nunchaku_sdxl = False
+        is_sdxl = False
         
         # First, try Forge path (ForgeDiffusionEngine has forge_objects)
         if hasattr(model, "inner_model") and hasattr(model.inner_model, "inner_model"):
@@ -74,19 +76,41 @@ class RK_Method_Beta:
                         k_model = forge_objects.unet.model
                         if hasattr(k_model, "diffusion_model"):
                             diffusion_model = k_model.diffusion_model
-                            # Check if it's Nunchaku Qwen Image or FLUX1
+                            # Check if it's Nunchaku Qwen Image, FLUX1, or SDXL
                             try:
                                 from backend.nn.svdq import SVDQFluxTransformer2DModel, NunchakuQwenImageTransformer2DModel
+                                from backend.nn.nunchaku_sdxl_unet import SVDQUNet2DConditionModel
                                 if isinstance(diffusion_model, NunchakuQwenImageTransformer2DModel):
                                     is_nunchaku_qwen_image = True
                                 elif isinstance(diffusion_model, SVDQFluxTransformer2DModel):
                                     is_nunchaku_flux1 = True
+                                elif isinstance(diffusion_model, SVDQUNet2DConditionModel):
+                                    is_nunchaku_sdxl = True
+                                else:
+                                    # Check if it's standard SDXL (IntegratedUNet2DConditionModel or UNet2DConditionModel)
+                                    try:
+                                        from backend.nn.unet import IntegratedUNet2DConditionModel
+                                        if isinstance(diffusion_model, IntegratedUNet2DConditionModel):
+                                            # Check if inner model is SDXL UNet
+                                            if hasattr(inner_model, "is_sdxl") and inner_model.is_sdxl:
+                                                is_sdxl = True
+                                    except (ImportError, TypeError):
+                                        pass
                             except (ImportError, TypeError):
                                 pass
                         
                         if hasattr(k_model, "model_sampling"):
                             model_sampling = k_model.model_sampling
-                            model_type_str = "QwenImage" if is_nunchaku_qwen_image else ("FLUX1" if is_nunchaku_flux1 else "Forge")
+                            if is_nunchaku_qwen_image:
+                                model_type_str = "Nunchaku QwenImage"
+                            elif is_nunchaku_flux1:
+                                model_type_str = "Nunchaku FLUX1"
+                            elif is_nunchaku_sdxl:
+                                model_type_str = "Nunchaku SDXL"
+                            elif is_sdxl:
+                                model_type_str = "SDXL"
+                            else:
+                                model_type_str = "Forge"
                             model_sampling_path = f"forge_objects.unet.model.model_sampling ({model_type_str})"
                 except (AttributeError, TypeError):
                     pass
@@ -110,7 +134,16 @@ class RK_Method_Beta:
                 model_sampling_path = "model.model.model_sampling"
         
         if model_sampling is None:
-            model_type_str = "QwenImage" if is_nunchaku_qwen_image else ("FLUX1" if is_nunchaku_flux1 else "Other")
+            if is_nunchaku_qwen_image:
+                model_type_str = "Nunchaku QwenImage"
+            elif is_nunchaku_flux1:
+                model_type_str = "Nunchaku FLUX1"
+            elif is_nunchaku_sdxl:
+                model_type_str = "Nunchaku SDXL"
+            elif is_sdxl:
+                model_type_str = "SDXL"
+            else:
+                model_type_str = "Other"
             raise AttributeError(f"model_sampling not found. Model type: {model_type_str}. Tried: forge_objects.unet.model.model_sampling (Forge), model.inner_model.inner_model.model_sampling (ComfyUI BaseModel), model.inner_model.model_sampling, model.model.model_sampling")
         
         self.sigma_min                   : Tensor                   = model_sampling.sigma_min.to(dtype=dtype, device=work_device)

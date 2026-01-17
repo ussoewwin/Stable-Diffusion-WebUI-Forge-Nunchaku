@@ -114,6 +114,14 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 
 **❌ IA3:** Not supported for Nunchaku models
 
+### Non-Quantized Qwen Image (QI) Models
+
+**Status:** ❌ LoRA and ControlNet Not Implemented
+
+**Issue:** Non-quantized Qwen Image (QI) models do not have LoRA or ControlNet support implemented. The performance is too heavy for development and testing in our environment.
+
+**Note:** This implementation is designed specifically for Nunchaku quantization models. For non-quantized Qwen Image models, please use alternative implementations or consider using Nunchaku quantized models instead.
+
 ## Changelog
 
 ### Version 1.2.1
