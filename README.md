@@ -187,9 +187,17 @@ This project is built upon the following repositories:
 
 ## License
 
-This project is licensed under the following licenses:
+This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
 
-- **AGPL-3.0** - GNU Affero General Public License v3.0
-- **Apache 2.0** - Apache License 2.0
+### Licenses of Base Repositories
+
+This project is built upon the following repositories, each with their respective licenses:
+
+- **[stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)** - AGPL-3.0
+- **[sd-webui-forge-classic (neo branch)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)** - AGPL-3.0
+- **[ComfyUI](https://github.com/Comfy-Org/ComfyUI)** - GPL-3.0
+- **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Please refer to the repository for license details
+- **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Please refer to the repository for license details
+- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - Please refer to the repository for license details
 
 See [LICENSE](LICENSE) file for details.
