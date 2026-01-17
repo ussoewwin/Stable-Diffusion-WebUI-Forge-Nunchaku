@@ -6,24 +6,7 @@
 
 ## About
 
-This program is a fork that integrates Nunchaku support into Stable Diffusion WebUI Forge. It is built upon the following repositories:
-
-### Base Repositories
-
-- **[stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)**  
-  Original Forge implementation by [@lllyasviel](https://github.com/lllyasviel)
-
-- **[sd-webui-forge-classic (neo branch)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)**  
-  Classic Forge implementation by [@Haoming02](https://github.com/Haoming02)
-
-- **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)**  
-  Nunchaku integration reference implementation by [@ussoewwin](https://github.com/ussoewwin)
-
-- **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)**  
-  LoRA Loader & Diffsynth ControlNet Loader for Nunchaku Qwen Image & Nunchaku Z-Image Turbo by [@ussoewwin](https://github.com/ussoewwin)
-
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
-  ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
+This program is a fork that integrates Nunchaku support into Stable Diffusion WebUI Forge.
 
 ## Features
 
@@ -51,23 +34,16 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
   - Supports Flux Union ControlNet models (e.g., `flux_shakker_labs_union_pro-2-fp8.safetensors`)
   - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
-  - Automatic model detection and loading via `controlnet_x_embedder.weight` key detection (Flux)
-  - Automatic model detection and loading via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection (Qwen Image)
+  - Automatic model detection and loading:
+    - Flux models: via `controlnet_x_embedder.weight` key detection
+    - Qwen Image models: via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection
   - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
   - Strict model type checking to ensure compatibility with correct model types
+  - Complete and independent implementation for each model type
 
   <img src="png/f1cn.png" alt="Flux1 ControlNet Union" width="400">
 
   *Flux1 Union ControlNet workflow example*
-
-- **Union ControlNet for Nunchaku Qwen Image**
-  - ✅ **Union ControlNet support for Nunchaku Qwen Image (QI) models**
-  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
-  - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
-  - Automatic model detection and loading via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection
-  - Strict model type checking to ensure compatibility only with Nunchaku Qwen Image models
-  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
-  - Complete and independent implementation separate from Flux ControlNet
 
 - **Built-in ADetailer**
   - Python 3.13 compatible face detection and enhancement
@@ -182,6 +158,25 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 ### Version 1.0.6
 
 - Nunchaku SDXL loader, LoRA loader, and ControlNet support completed
+
+## Base Repositories
+
+This project is built upon the following repositories:
+
+- **[stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)**  
+  Original Forge implementation by [@lllyasviel](https://github.com/lllyasviel)
+
+- **[sd-webui-forge-classic (neo branch)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)**  
+  Classic Forge implementation by [@Haoming02](https://github.com/Haoming02)
+
+- **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)**  
+  Nunchaku integration reference implementation by [@ussoewwin](https://github.com/ussoewwin)
+
+- **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)**  
+  LoRA Loader & Diffsynth ControlNet Loader for Nunchaku Qwen Image & Nunchaku Z-Image Turbo by [@ussoewwin](https://github.com/ussoewwin)
+
+- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
+  ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
 
 ## License
 
