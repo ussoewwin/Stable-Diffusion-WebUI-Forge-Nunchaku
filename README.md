@@ -45,16 +45,29 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - Robust change detection to handle model reloads correctly
   - AWQ quantization layer handling with safety switch
 
-- **Union ControlNet for Flux1 and Nunchaku Flux1**
-  - ✅ **Union ControlNet support for both Flux1 and Nunchaku Flux1 models**
+- **Union ControlNet for Flux1, Nunchaku Flux1, and Nunchaku Qwen Image**
+  - ✅ **Union ControlNet support for Flux1 and Nunchaku Flux1 models**
+  - ✅ **Union ControlNet support for Nunchaku Qwen Image (QI) models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
   - Supports Flux Union ControlNet models (e.g., `flux_shakker_labs_union_pro-2-fp8.safetensors`)
-  - Automatic model detection and loading via `controlnet_x_embedder.weight` key detection
+  - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
+  - Automatic model detection and loading via `controlnet_x_embedder.weight` key detection (Flux)
+  - Automatic model detection and loading via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection (Qwen Image)
   - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+  - Strict model type checking to ensure compatibility with correct model types
 
   <img src="png/f1cn.png" alt="Flux1 ControlNet Union" width="400">
 
   *Flux1 Union ControlNet workflow example*
+
+- **Union ControlNet for Nunchaku Qwen Image**
+  - ✅ **Union ControlNet support for Nunchaku Qwen Image (QI) models**
+  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
+  - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
+  - Automatic model detection and loading via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection
+  - Strict model type checking to ensure compatibility only with Nunchaku Qwen Image models
+  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+  - Complete and independent implementation separate from Flux ControlNet
 
 - **Built-in ADetailer**
   - Python 3.13 compatible face detection and enhancement
@@ -122,6 +135,19 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 **❌ IA3:** Not supported for Nunchaku models
 
 ## Changelog
+
+### Version 1.2.1
+
+- **Added Union ControlNet support for Nunchaku Qwen Image**
+  - Full Union ControlNet support for Nunchaku Qwen Image (QI) models
+  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
+  - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
+  - Automatic model detection via `transformer_blocks.0.img_mlp.net.0.proj.weight` key
+  - Strict model type checking to ensure compatibility only with Nunchaku Qwen Image models
+  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+  - Complete and independent implementation separate from Flux ControlNet
+  - Fixed device placement issues for ControlNet model loading
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.2.1) for details
 
 ### Version 1.2.0
 
