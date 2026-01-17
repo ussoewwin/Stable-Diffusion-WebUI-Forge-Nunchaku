@@ -196,8 +196,8 @@ This project is built upon the following repositories, each with their respectiv
 - **[stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)** - AGPL-3.0
 - **[sd-webui-forge-classic (neo branch)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)** - AGPL-3.0
 - **[ComfyUI](https://github.com/Comfy-Org/ComfyUI)** - GPL-3.0
-- **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Please refer to the repository for license details
-- **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Please refer to the repository for license details
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - Please refer to the repository for license details
+- **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Apache 2.0
+- **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Apache 2.0
+- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
 
 See [LICENSE](LICENSE) file for details.
