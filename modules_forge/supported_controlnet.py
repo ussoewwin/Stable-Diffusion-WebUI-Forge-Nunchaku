@@ -22,10 +22,10 @@ try:
     
     def _patched_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options=None):
         """Patched get_control that accepts transformer_options for Forge compatibility."""
-        try:
-            return _original_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options)
-        except TypeError:
-            return _original_controlnet_get_control(self, x_noisy, t, cond, batched_number)
+        # transformer_options is required in newer ComfyUI versions, default to empty dict if None
+        if transformer_options is None:
+            transformer_options = {}
+        return _original_controlnet_get_control(self, x_noisy, t, cond, batched_number, transformer_options)
     
     comfy.controlnet.ControlNet.get_control = _patched_controlnet_get_control
     
@@ -74,6 +74,19 @@ class ControlModelPatcher:
 class ControlNetPatcher(ControlModelPatcher):
     @staticmethod
     def try_build_from_state_dict(controlnet_data, ckpt_path):
+        # Nunchaku Qwen Image ControlNet ONLY (detected by transformer_blocks.0.img_mlp.net.0.proj.weight)
+        # This is for NunchakuQwenImageTransformer2DModel ONLY - NOT for standard QwenImageTransformer2DModel
+        if "transformer_blocks.0.img_mlp.net.0.proj.weight" in controlnet_data:
+            try:
+                from modules_forge.supported_controlnet_qwen_image import QwenImageControlNetPatcher
+                result = QwenImageControlNetPatcher.try_build_from_state_dict(controlnet_data, ckpt_path)
+                if result is not None:
+                    print(f"[ControlNet] Loaded Nunchaku Qwen Image ControlNet patcher (for NunchakuQwenImageTransformer2DModel ONLY)")
+                return result
+            except Exception as e:
+                print(f"Failed to load Nunchaku Qwen Image ControlNet: {e}")
+                return None
+        
         # Flux ControlNet (InstantX format)
         if "controlnet_x_embedder.weight" in controlnet_data:
             try:
