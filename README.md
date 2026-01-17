@@ -4,6 +4,10 @@
 
 ⚠️ **This project requires Python 3.13 exclusively.**
 
+<p align="center">
+  <img src="png/top.png" alt="Stable Diffusion WebUI Forge - Nunchaku" width="400">
+</p>
+
 ## About
 
 This program is a fork that integrates Nunchaku support into Stable Diffusion WebUI Forge.
