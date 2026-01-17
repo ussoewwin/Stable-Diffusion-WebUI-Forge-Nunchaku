@@ -98,8 +98,19 @@ class KModel(torch.nn.Module):
         # ComfyUI標準のmodel_samplingを追加（ControlNet.pre_run()がmodel.model_samplingを期待するため）
         if config is not None and hasattr(config, "model_type"):
             model_type = config.model_type
-            if hasattr(model_type, "name") and model_type.name == "FLUX":
-                self.model_sampling = ModelSamplingFluxWithConst(config)
+            if hasattr(model_type, "name"):
+                if model_type.name == "FLUX":
+                    self.model_sampling = ModelSamplingFluxWithConst(config)
+                elif model_type.name == "FLOW":
+                    # Qwen Image uses ModelType.FLOW
+                    # Use ComfyUI's model_sampling function to create the correct ModelSampling class
+                    import comfy.model_base
+                    # Convert model_type.name to ModelType Enum
+                    from comfy.model_base import ModelType
+                    model_type_enum = ModelType.FLOW
+                    self.model_sampling = comfy.model_base.model_sampling(config, model_type_enum)
+                else:
+                    self.model_sampling = None
             else:
                 self.model_sampling = None
         else:

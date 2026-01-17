@@ -840,10 +840,19 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
                         temb=temb,
                         image_rotary_emb=image_rotary_emb,
                     )
-                # ControlNet helpers(device/dtype-safe residual adds)
-                _control = control if control is not None else (transformer_options.get("control", None) if isinstance(transformer_options, dict) else None)
+                
+                # ControlNet helpers (device/dtype-safe residual adds)
+                # IMPORTANT: This ControlNet logic is ONLY for NunchakuQwenImageTransformer2DModel
+                # This does NOT affect SVDQFluxTransformer2DModel or other models in this file
+                # ComfyUI-Nunchaku style: support both control parameter and transformer_options
+                # Qwen Image ControlNet uses "input" format (same structure as Flux but only "input" key)
+                _control = (
+                    control
+                    if control is not None
+                    else (transformer_options.get("control", None) if isinstance(transformer_options, dict) else None)
+                )
                 if isinstance(_control, dict):
-                    control_i = _control.get("input")
+                    control_i = _control.get("input")  # Qwen Image ControlNet uses "input" key
                     try:
                         _scale = float(_control.get("weight", _control.get("scale", 1.0)))
                     except Exception:
@@ -854,7 +863,10 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
                 if control_i is not None and i < len(control_i):
                     add = control_i[i]
                     if add is not None:
-                        if getattr(add, "device", None) != hidden_states.device or getattr(add, "dtype", None) != hidden_states.dtype:
+                        if (
+                            getattr(add, "device", None) != hidden_states.device
+                            or getattr(add, "dtype", None) != hidden_states.dtype
+                        ):
                             add = add.to(device=hidden_states.device, dtype=hidden_states.dtype, non_blocking=True)
                         t = min(hidden_states.shape[1], add.shape[1])
                         if t > 0:
