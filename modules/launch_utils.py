@@ -295,12 +295,12 @@ def requirements_met(requirements_file):
             elif op == ">":
                 if installed <= required:
                     return False
-            elif op == "<=":
-                if installed > required:
-                    return False
-            elif op == "<":
-                if installed >= required:
-                    return False
+                elif op == "<=":
+                    if installed > required:
+                        return False
+                elif op == "<":
+                    if installed >= required:
+                        return False
 
     return True
 

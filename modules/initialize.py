@@ -100,6 +100,16 @@ def initialize_rest(*, reload_script_modules=False):
 
     sd_samplers.set_samplers()
     startup_timer.record("set samplers")
+    
+    # Register RES4LYF samplers and schedulers
+    try:
+        from modules_forge import forge_res4lyf_samplers
+        forge_res4lyf_samplers.register_res4lyf_samplers()
+        forge_res4lyf_samplers.register_res4lyf_schedulers()
+        startup_timer.record("register RES4LYF samplers")
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to register RES4LYF samplers: {e}", exc_info=True)
 
     from modules import extensions
 
