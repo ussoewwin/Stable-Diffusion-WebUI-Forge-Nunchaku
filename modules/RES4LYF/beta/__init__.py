@@ -5,6 +5,8 @@ from . import samplers_extensions
 
 
 def add_beta(NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, extra_samplers):
+    # Lazy import to avoid circular dependencies
+    from .rk_coefficients_beta import RK_SAMPLER_NAMES_BETA_NO_FOLDERS
     
     NODE_CLASS_MAPPINGS.update({
         #"SharkSampler"                    : samplers.SharkSampler,
@@ -87,26 +89,37 @@ def add_beta(NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, extra_samplers):
 
     })
 
-    extra_samplers.update({
-        "res_2m"     : sample_res_2m,
-        "res_3m"     : sample_res_3m,
-        "res_2s"     : sample_res_2s,
-        "res_3s"     : sample_res_3s,
-        "res_5s"     : sample_res_5s,
-        "res_6s"     : sample_res_6s,
-        "res_2m_ode" : sample_res_2m_ode,
-        "res_3m_ode" : sample_res_3m_ode,
-        "res_2s_ode" : sample_res_2s_ode,
-        "res_3s_ode" : sample_res_3s_ode,
-        "res_5s_ode" : sample_res_5s_ode,
-        "res_6s_ode" : sample_res_6s_ode,
+    # Register all samplers from RK_SAMPLER_NAMES_BETA_NO_FOLDERS
+    # Create sampler functions dynamically
+    sampler_functions = {}
+    for sampler_name in RK_SAMPLER_NAMES_BETA_NO_FOLDERS:
+        if sampler_name == "none":
+            continue
+        
+        # Create standard sampler function with proper closure
+        def make_sample_fn(rk_type):
+            def sample_fn(model, x, sigmas, extra_args=None, callback=None, disable=None):
+                return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type=rk_type)
+            return sample_fn
+        
+        sampler_functions[sampler_name] = make_sample_fn(sampler_name)
+        
+        # Create ODE version (eta=0.0, eta_substep=0.0) for non-implicit samplers
+        # Skip ODE versions for implicit samplers (those with implicit-related keywords)
+        if not any(keyword in sampler_name for keyword in ["gauss-legendre", "radau", "lobatto", "irk_exp_diag", "kraaijevanger", "qin_zhang", "pareschi", "crouzeix"]):
+            ode_sampler_name = f"{sampler_name}_ode"
+            
+            def make_sample_ode_fn(rk_type):
+                def sample_ode_fn(model, x, sigmas, extra_args=None, callback=None, disable=None):
+                    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type=rk_type, eta=0.0, eta_substep=0.0)
+                return sample_ode_fn
+            
+            sampler_functions[ode_sampler_name] = make_sample_ode_fn(sampler_name)
 
-        "deis_2m"    : sample_deis_2m,
-        "deis_3m"    : sample_deis_3m,
-        "deis_2m_ode": sample_deis_2m_ode,
-        "deis_3m_ode": sample_deis_3m_ode,
-        "rk_beta": rk_sampler_beta.sample_rk_beta,
-    })
+    extra_samplers.update(sampler_functions)
+    
+    # Also register the generic rk_beta sampler
+    extra_samplers["rk_beta"] = rk_sampler_beta.sample_rk_beta
     
     NODE_DISPLAY_NAME_MAPPINGS.update({
             #"SharkSampler"                          : "SharkSampler",
@@ -156,42 +169,4 @@ def add_beta(NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, extra_samplers):
     })
     
     return NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, extra_samplers
-
-
-
-def sample_res_2m(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_2m",)
-def sample_res_3m(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_3m",)
-def sample_res_2s(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_2s",)
-def sample_res_3s(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_3s",)
-def sample_res_5s(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_5s",)
-def sample_res_6s(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_6s",)
-
-def sample_res_2m_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_2m", eta=0.0, eta_substep=0.0, )
-def sample_res_3m_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_3m", eta=0.0, eta_substep=0.0, )
-def sample_res_2s_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_2s", eta=0.0, eta_substep=0.0, )
-def sample_res_3s_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_3s", eta=0.0, eta_substep=0.0, )
-def sample_res_5s_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_5s", eta=0.0, eta_substep=0.0, )
-def sample_res_6s_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="res_6s", eta=0.0, eta_substep=0.0, )
-
-def sample_deis_2m(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="deis_2m",)
-def sample_deis_3m(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="deis_3m",)
-
-def sample_deis_2m_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="deis_2m", eta=0.0, eta_substep=0.0, )
-def sample_deis_3m_ode(model, x, sigmas, extra_args=None, callback=None, disable=None):
-    return rk_sampler_beta.sample_rk_beta(model, x, sigmas, None, extra_args, callback, disable, rk_type="deis_3m", eta=0.0, eta_substep=0.0, )
 
