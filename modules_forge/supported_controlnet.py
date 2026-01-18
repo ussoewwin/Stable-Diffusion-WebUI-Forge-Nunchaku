@@ -1,5 +1,21 @@
 import os
+import sys
 import torch
+
+# Ensure ComfyUI-master is in sys.path before importing comfy
+# This ensures we use ComfyUI-master/comfy instead of the project root comfy directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+comfyui_master_path = os.path.join(project_root, "ComfyUI-master")
+comfyui_master_path = os.path.normpath(comfyui_master_path)
+
+if os.path.exists(comfyui_master_path):
+    if comfyui_master_path not in sys.path:
+        sys.path.insert(0, comfyui_master_path)
+    # Remove project root comfy directory from sys.path if it exists
+    project_comfy_path = os.path.join(project_root, "comfy")
+    project_comfy_path = os.path.normpath(project_comfy_path)
+    if project_comfy_path in sys.path:
+        sys.path.remove(project_comfy_path)
 
 from huggingface_guess.detection import unet_config_from_diffusers_unet, model_config_from_unet
 from huggingface_guess.utils import unet_to_diffusers
@@ -12,7 +28,7 @@ from modules_forge.shared import add_supported_control_model
 
 # =============================================================================
 # ComfyUI ControlNet patches for Forge compatibility
-# Uses Forge's bundled comfy package (no external ComfyUI required)
+# Uses ComfyUI-master/comfy package (located in ComfyUI-master directory)
 # =============================================================================
 try:
     import comfy.controlnet
