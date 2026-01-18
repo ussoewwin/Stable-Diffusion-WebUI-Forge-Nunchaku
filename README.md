@@ -61,6 +61,14 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - Optimized for modern hardware and workflows
   - Future-proof architecture
 
+- **RES4LYF Sampler Support**
+  - ✅ **Full support for RES4LYF (RES4) samplers**
+  - Support for all model types including Nunchaku Qwen Image, Nunchaku Flux1, Nunchaku SDXL, standard SDXL, and standard Flux1
+  - Comprehensive sampler collection with multistep and exponential variants
+  - ODE version support for non-implicit samplers
+  - Robust model detection and handling for both Forge and ComfyUI model structures
+  - Automatic CONST and EPS model type detection for proper sampling behavior
+
 ## Models
 
 ### Nunchaku SDXL Models
@@ -123,6 +131,19 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 **Note:** This implementation is designed specifically for Nunchaku quantization models. For non-quantized Qwen Image models, please use alternative implementations or consider using Nunchaku quantized models instead.
 
 ## Changelog
+
+### Version 1.3.0
+
+- **Added RES4LYF Sampler Support**
+  - Full support for RES4LYF (RES4) samplers for all model types
+  - Support for Nunchaku Qwen Image, Nunchaku Flux1, Nunchaku SDXL, standard SDXL, and standard Flux1 models
+  - Comprehensive sampler collection including multistep (res_2m, res_3m, etc.) and exponential (res_2s, res_3s, etc.) variants
+  - ODE version support for non-implicit samplers
+  - Robust model detection and handling for both Forge and ComfyUI model structures
+  - Automatic CONST and EPS model type detection for proper sampling behavior
+  - Fixed model_sampling access for Forge models via KModel wrapper
+  - Improved compatibility with ComfyUI-master directory structure
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.3.0) for details
 
 ### Version 1.2.1
 
