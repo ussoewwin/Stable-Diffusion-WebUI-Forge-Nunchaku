@@ -10,7 +10,21 @@ from tqdm.auto import tqdm
 
 import torch
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "comfy"))
+# Ensure ComfyUI-master is in sys.path before importing comfy
+# This ensures we use ComfyUI-master/comfy instead of the project root comfy directory
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+comfyui_master_path = os.path.join(project_root, "ComfyUI-master")
+comfyui_master_path = os.path.normpath(comfyui_master_path)
+
+if os.path.exists(comfyui_master_path):
+    if comfyui_master_path not in sys.path:
+        sys.path.insert(0, comfyui_master_path)
+    # Remove project root comfy directory from sys.path if it exists
+    project_comfy_path = os.path.join(project_root, "comfy")
+    project_comfy_path = os.path.normpath(project_comfy_path)
+    if project_comfy_path in sys.path:
+        sys.path.remove(project_comfy_path)
+
 import comfy.sd
 import comfy.controlnet
 import comfy.model_management
