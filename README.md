@@ -132,7 +132,7 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 
 ## Changelog
 
-For detailed changelog information, please see [CHANGELOG.md](changelog/CHANGELOG.md).
+For detailed changelog information, please see [CHANGELOG.md](Changelog/CHANGELOG.md).
 
 ## Base Repositories
 
