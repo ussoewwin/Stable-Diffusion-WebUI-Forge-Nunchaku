@@ -138,6 +138,32 @@ def initialize_rest(*, reload_script_modules=False):
     localization.list_localizations(cmd_opts.localizations_dir)
     startup_timer.record("list localizations")
 
+    # Add project root models/model_patches to ComfyUI folder_paths
+    try:
+        from modules.paths_internal import models_path
+        import folder_paths
+        
+        model_patches_path = os.path.join(models_path, "model_patches")
+        model_patches_path = os.path.normpath(model_patches_path)
+        
+        # Add path even if directory doesn't exist yet (it will be created when needed)
+        if hasattr(folder_paths, "add_model_folder_path"):
+            folder_paths.add_model_folder_path("model_patches", model_patches_path)
+        elif hasattr(folder_paths, "folder_names_and_paths"):
+            # Fallback: directly add to folder_names_and_paths
+            if "model_patches" in folder_paths.folder_names_and_paths:
+                paths, exts = folder_paths.folder_names_and_paths["model_patches"]
+                if model_patches_path not in paths:
+                    paths.append(model_patches_path)
+            else:
+                folder_paths.folder_names_and_paths["model_patches"] = ([model_patches_path], set())
+        print(f"Added model_patches path: {model_patches_path}")
+        
+        startup_timer.record("add model_patches path")
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to add model_patches path: {e}", exc_info=True)
+
     with startup_timer.subcategory("load scripts"):
         scripts.load_scripts()
 

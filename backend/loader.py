@@ -272,11 +272,36 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     rank = guess.unet_config.pop("rank")
                     _nz = True
 
-                from backend.nn.lumina import NextDiT
+                from comfy.ldm.lumina.model import NextDiT
+                import comfy.ops
 
-                model_loader = lambda c: NextDiT(**c)
+                # NextDiT requires operations parameter (cannot be None)
+                # For standard ZIT: use ComfyUI's manual_cast operations (same as ComfyUI's Lumina2)
+                # For Nunchaku ZIT: use disable_weight_init (torch.nn wrapper) since using_forge_operations(operations=False) uses torch.nn
+                if _nz:
+                    # Nunchaku ZIT: use disable_weight_init (torch.nn wrapper) since operations=False uses torch.nn directly
+                    # CRITICAL: NextDiT.__init__ requires operations parameter (cannot be None)
+                    # using_forge_operations(operations=False) only affects context, not NextDiT.__init__
+                    guess.unet_config["operations"] = comfy.ops.disable_weight_init
+                    model_loader = lambda c: NextDiT(**c)
+                else:
+                    # Standard ZIT: use ComfyUI's manual_cast operations (same as ComfyUI BaseModel)
+                    # Same as ComfyUI BaseModel.__init__: operations = comfy.ops.pick_operations(...)
+                    # For ZIT/Lumina2, ComfyUI uses manual_cast operations
+                    # CRITICAL: Set operations in unet_config before creating model_loader, same as ComfyUI
+                    # ComfyUI BaseModel sets operations in unet_config before calling unet_model(**unet_config, ...)
+                    guess.unet_config["operations"] = comfy.ops.manual_cast
+                    model_loader = lambda c: NextDiT(**c)
 
             unet_config = guess.unet_config.copy()
+            
+            # CRITICAL: Ensure operations is set in unet_config for standard ZIT (same as ComfyUI BaseModel)
+            # ComfyUI BaseModel.__init__ sets operations before calling unet_model(**unet_config, ...)
+            if cls_name in ("Lumina2Transformer2DModel", "ZImageTransformer2DModel") and not _nz:
+                import comfy.ops
+                # Ensure operations is set in unet_config for standard ZIT (same as ComfyUI Lumina2)
+                unet_config["operations"] = comfy.ops.manual_cast
+            
             state_dict_parameters = memory_management.state_dict_parameters(state_dict)
             state_dict_dtype = memory_management.state_dict_dtype(state_dict)
 
@@ -298,14 +323,30 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             computation_dtype = memory_management.get_computation_dtype(load_device, parameters=state_dict_parameters, supported_dtypes=guess.supported_inference_dtypes)
             offload_device = memory_management.unet_offload_device()
 
+            # CRITICAL: Ensure operations is set in unet_config for standard ZIT before calling model_loader
+            # Same as ComfyUI BaseModel.__init__: operations is set before calling unet_model(**unet_config, ...)
+            if cls_name in ("Lumina2Transformer2DModel", "ZImageTransformer2DModel") and not _nz:
+                import comfy.ops
+                # Ensure operations is set in unet_config for standard ZIT (same as ComfyUI Lumina2)
+                unet_config["operations"] = comfy.ops.manual_cast
+            
             if storage_dtype in ["nf4", "fp4", "gguf"]:
                 initial_device = memory_management.unet_initial_load_device(parameters=state_dict_parameters, dtype=computation_dtype)
+                # CRITICAL: Ensure operations is set in unet_config for standard ZIT before calling model_loader
+                if cls_name in ("Lumina2Transformer2DModel", "ZImageTransformer2DModel") and not _nz:
+                    import comfy.ops
+                    unet_config["operations"] = comfy.ops.manual_cast
                 with using_forge_operations(device=initial_device, dtype=computation_dtype, manual_cast_enabled=False, bnb_dtype=storage_dtype):
                     model = model_loader(unet_config)
             else:
                 initial_device = memory_management.unet_initial_load_device(parameters=state_dict_parameters, dtype=storage_dtype)
                 need_manual_cast = storage_dtype != computation_dtype
                 to_args = dict(device=initial_device, dtype=storage_dtype)
+
+                # CRITICAL: Ensure operations is set in unet_config for standard ZIT before calling model_loader
+                if cls_name in ("Lumina2Transformer2DModel", "ZImageTransformer2DModel") and not _nz:
+                    import comfy.ops
+                    unet_config["operations"] = comfy.ops.manual_cast
 
                 with using_forge_operations(operations=False if (_nz or _nf) else None, **to_args, manual_cast_enabled=need_manual_cast):
                     model = model_loader(unet_config).to(**to_args)

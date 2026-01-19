@@ -927,7 +927,7 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
 
 from functools import wraps
 
-from backend.nn.lumina import JointAttention, NextDiT, clamp_fp16
+from comfy.ldm.lumina.model import JointAttention, NextDiT, clamp_fp16
 
 
 def fuse_to_svdquant_linear(linear1: nn.Linear, linear2: nn.Linear, **kwargs) -> SVDQW4A4Linear:
