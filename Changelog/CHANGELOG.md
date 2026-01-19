@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 1.3.1
+
+- **Added Diffsynth Union ControlNet support for ZIT (standard and Nunchaku)**
+  - Full Diffsynth Union ControlNet support for both standard Z-Image Turbo (ZIT) and Nunchaku ZIT models
+  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
+  - Supports ZIT ControlNet models (e.g., `z-image-turbo-controlnet.safetensors`)
+  - Automatic model detection for ZIT models via NextDiT model type
+  - Strict model type checking to ensure compatibility only with ZIT models
+  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+  - Complete implementation based on ComfyUI's nodes_model_patch.py
+  - Fixed double patching and stale patches issues causing RecursionError
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.3.1) for details
+
 ## Version 1.3.0
 
 - **Added RES4LYF Sampler Support**
