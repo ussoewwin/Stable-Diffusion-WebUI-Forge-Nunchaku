@@ -50,8 +50,7 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   *Flux1 Union ControlNet workflow example*
 
 - **Diffsynth Union ControlNet for Z-Image Turbo (ZIT) - Standard and Nunchaku**
-  - ✅ **Diffsynth Union ControlNet support for standard Z-Image Turbo (ZIT) models**
-  - ✅ **Diffsynth Union ControlNet support for Nunchaku Z-Image Turbo (ZIT) models**
+  - ✅ **Diffsynth Union ControlNet support for standard Z-Image Turbo (ZIT) and Nunchaku Z-Image Turbo (ZIT) models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
   - Supports ZIT ControlNet models (e.g., `z-image-turbo-controlnet.safetensors`)
   - **Note:** ZIT Diffsynth ControlNet uses a different mechanism than standard ControlNet
