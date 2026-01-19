@@ -942,7 +942,7 @@ def versions_html():
         _versions.append(f"xformers: {importlib.metadata.version('xformers')}")
 
     return f"""
-version: <a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/neo">neo</a>
+version: <a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/nunchaku">nunchaku</a>
 &#x2000;•&#x2000;
 python: <span title="{sys.version}">{python_version}</span>
 &#x2000;•&#x2000;
