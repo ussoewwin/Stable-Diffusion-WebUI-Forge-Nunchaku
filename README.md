@@ -49,6 +49,19 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
   *Flux1 Union ControlNet workflow example*
 
+- **Diffsynth Union ControlNet for Z-Image Turbo (ZIT) - Standard and Nunchaku**
+  - ✅ **Diffsynth Union ControlNet support for standard Z-Image Turbo (ZIT) models**
+  - ✅ **Diffsynth Union ControlNet support for Nunchaku Z-Image Turbo (ZIT) models**
+  - Multiple ControlNet models can be used simultaneously (Union ControlNet)
+  - Supports ZIT ControlNet models (e.g., `z-image-turbo-controlnet.safetensors`)
+  - **Note:** ZIT Diffsynth ControlNet uses a different mechanism than standard ControlNet
+  - ZIT ControlNet works as a "model patch" rather than a traditional ControlNet
+  - Automatic model detection for ZIT models via NextDiT model type
+  - Strict model type checking to ensure compatibility only with ZIT models
+  - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
+  - Complete implementation based on ComfyUI's nodes_model_patch.py
+  - Fixed double patching and stale patches issues causing RecursionError
+
 - **Built-in ADetailer**
   - Python 3.13 compatible face detection and enhancement
   - YOLOv8, YOLOv11, and InsightFace hybrid detection system
