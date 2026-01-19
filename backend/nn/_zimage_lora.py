@@ -276,6 +276,107 @@ def _classify_and_map_key(key: str) -> Optional[Tuple[str, str, Optional[str], s
     return None
 
 
+def _classify_and_map_key_standard_zit(key: str) -> Optional[Tuple[str, str, Optional[str], str]]:
+    """
+    Classifies a LoRA key for standard ZIT models (w1/w2/w3 separate, no GLU fusion).
+    Standard ZIT models have separate w1, w2, w3 modules in feed_forward layers.
+    This MUST match ComfyUI's z_image_to_diffusers mapping exactly.
+    
+    ComfyUI z_image_to_diffusers mapping (from comfy/utils.py):
+    - attention.to_q/to_k/to_v -> attention.qkv (fused)
+    - attention.norm_q.weight -> attention.q_norm.weight
+    - attention.norm_k.weight -> attention.k_norm.weight
+    - attention.to_out.0 -> attention.out
+    - feed_forward.w1/w2/w3 -> feed_forward.w1/w2/w3 (no change)
+    - attention_norm1/attention_norm2/ffn_norm1/ffn_norm2 -> same
+    - adaLN_modulation -> same
+    
+    Supports: layers.N, context_refiner.N, noise_refiner.N
+    """
+    k = key
+    # Strip common prefixes
+    if k.startswith("transformer."):
+        k = k[len("transformer."):]
+    if k.startswith("diffusion_model."):
+        k = k[len("diffusion_model."):]
+    
+    # Extract base key and A/B/alpha suffix
+    base = None
+    ab = None
+
+    # Check for LoRA weight suffix (lora_A, lora_B, lora_down, lora_up, etc.)
+    m = _RE_LORA_SUFFIX.search(k)
+    if m:
+        tag = m.group("tag")
+        base = k[: m.start()]
+        if "lora_A" in tag or tag.endswith(".A") or "down" in tag:
+            ab = "A"
+        elif "lora_B" in tag or tag.endswith(".B") or "up" in tag:
+            ab = "B"
+    else:
+        # Check for alpha suffix
+        m = _RE_ALPHA_SUFFIX.search(k)
+        if m:
+            ab = "alpha"
+            base = k[: m.start()]
+
+    if base is None or ab is None:
+        return None  # Not a recognized LoRA key format
+
+    # Standard ZIT mapping rules - MUST match ComfyUI's z_image_to_diffusers exactly
+    # Supports: layers, context_refiner, noise_refiner
+    
+    # 1. QKV attention fusion: to_q/to_k/to_v -> qkv
+    # ComfyUI: attention.to_q -> attention.qkv (with offset)
+    qkv_match = re.match(r"^(layers|context_refiner|noise_refiner)[._](\d+)[._]attention[._]to[._]([qkv])$", base)
+    if qkv_match:
+        block_type = qkv_match.group(1)
+        layer_idx = qkv_match.group(2)
+        final_key = f"{block_type}.{layer_idx}.attention.qkv"
+        return "qkv", final_key, qkv_match.group(3).upper(), ab
+    
+    # 2. Attention norm_q/norm_k -> q_norm/k_norm (ComfyUI mapping)
+    # ComfyUI: attention.norm_q.weight -> attention.q_norm.weight
+    norm_match = re.match(r"^(layers|context_refiner|noise_refiner)[._](\d+)[._]attention[._]norm_([qk])$", base)
+    if norm_match:
+        block_type = norm_match.group(1)
+        layer_idx = norm_match.group(2)
+        norm_type = norm_match.group(3)  # q or k
+        final_key = f"{block_type}.{layer_idx}.attention.{norm_type}_norm"
+        return "regular", final_key, None, ab
+    
+    # 3. Attention output projection: to_out -> out
+    # ComfyUI: attention.to_out.0 -> attention.out
+    out_match = re.match(r"^(layers|context_refiner|noise_refiner)[._](\d+)[._]attention[._]to[._]out(?:[._]0)?$", base)
+    if out_match:
+        block_type = out_match.group(1)
+        layer_idx = out_match.group(2)
+        final_key = f"{block_type}.{layer_idx}.attention.out"
+        return "regular", final_key, None, ab
+    
+    # 4. Feed forward layers: w1, w2, w3 are separate (NO fusion for standard ZIT)
+    # ComfyUI: feed_forward.w1/w2/w3 -> feed_forward.w1/w2/w3 (no change)
+    ff_match = re.match(r"^(layers|context_refiner|noise_refiner)[._](\d+)[._]feed_forward[._](w1|w2|w3)$", base)
+    if ff_match:
+        block_type = ff_match.group(1)
+        layer_idx = ff_match.group(2)
+        ff_type = ff_match.group(3)  # w1, w2, or w3
+        final_key = f"{block_type}.{layer_idx}.feed_forward.{ff_type}"
+        return "regular", final_key, None, ab
+    
+    # 5. Other layer components (adaLN_modulation, attention_norm1/2, ffn_norm1/2, etc.)
+    # ComfyUI: these are passed through without transformation
+    generic_match = re.match(r"^(layers|context_refiner|noise_refiner)[._](\d+)[._](.+)$", base)
+    if generic_match:
+        block_type = generic_match.group(1)
+        layer_idx = generic_match.group(2)
+        component = generic_match.group(3)
+        final_key = f"{block_type}.{layer_idx}.{component}"
+        return "regular", final_key, None, ab
+
+    return None
+
+
 def _fuse_qkv_lora(qkv_weights: Dict[str, torch.Tensor], model: Optional[nn.Module] = None, base_key: Optional[str] = None) -> Tuple[
     Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
     """Fuse Q/K/V LoRA weights into a single QKV tensor for Z-Image."""
@@ -347,17 +448,18 @@ def _fuse_glu_lora(glu_weights: Dict[str, torch.Tensor]) -> Tuple[
 
 
 def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, module_name: str,
-                          model: nn.Module) -> None:
+                          model: nn.Module, strength: float = 1.0, alpha: Optional[torch.Tensor] = None) -> None:
     """Helper to append combined LoRA weights to a module (Z-Image)."""
     if A.ndim != 2 or B.ndim != 2:
         raise ValueError(f"{module_name}: A/B must be 2D, got {A.shape}, {B.shape}")
-    if A.shape[1] != module.in_features:
-        raise ValueError(f"{module_name}: A shape {A.shape} mismatch with in_features={module.in_features}")
-    if B.shape[0] != module.out_features:
-        raise ValueError(f"{module_name}: B shape {B.shape} mismatch with out_features={module.out_features}")
 
     # Handle Nunchaku LoRA-ready modules (proj_down/proj_up)
     if hasattr(module, "proj_down") and hasattr(module, "proj_up"):
+        if A.shape[1] != module.in_features:
+            raise ValueError(f"{module_name}: A shape {A.shape} mismatch with in_features={module.in_features}")
+        if B.shape[0] != module.out_features:
+            raise ValueError(f"{module_name}: B shape {B.shape} mismatch with out_features={module.out_features}")
+        
         pd, pu = module.proj_down.data, module.proj_up.data
         pd = unpack_lowrank_weight(pd, down=True)
         pu = unpack_lowrank_weight(pu, down=False)
@@ -381,8 +483,56 @@ def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, m
             model._lora_slots = {}
         slot = model._lora_slots.setdefault(module_name, {"base_rank": base_rank, "appended": 0, "axis_down": axis_down, "type": "nunchaku"})
         slot["appended"] += A.shape[0]
+    # Handle standard ZIT modules (comfy.ops.manual_cast.Linear) - direct weight modification
+    elif hasattr(module, "weight") and hasattr(module, "in_features") and hasattr(module, "out_features"):
+        # Standard ZIT: Directly modify module.weight.data
+        # Calculate B @ A and add to original weight
+        
+        # Ensure original_weight is stored for reset (offload to CPU to save VRAM)
+        # NOTE: This ONLY affects standard ZIT models, NOT Nunchaku ZIT models
+        # Nunchaku models use the proj_down/proj_up path above which doesn't clone weights
+        if not hasattr(module, "_original_weight"):
+            module._original_weight = module.weight.data.to(device='cpu')
+
+        r_lora = A.shape[0]
+        scale_alpha = alpha.item() if alpha is not None else float(r_lora)
+        scale = strength * (scale_alpha / max(1.0, float(r_lora)))
+
+        # Move A and B to same device/dtype as module.weight for calculation
+        A_gpu = A.to(dtype=module.weight.dtype, device=module.weight.device)
+        B_gpu = B.to(dtype=module.weight.dtype, device=module.weight.device)
+        
+        # Calculate B @ A: [out_features, rank] @ [rank, in_features] = [out_features, in_features]
+        delta = torch.mm(B_gpu, A_gpu)
+        
+        # Apply scaling
+        delta *= scale
+
+        # Verify shape: module.weight should be [out_features, in_features], delta should match
+        if module.weight.shape != delta.shape:
+            # If shapes don't match, check if weight is transposed
+            if module.weight.shape == delta.T.shape:
+                # Weight is transposed, transpose delta to match
+                delta = delta.T
+            elif module.weight.shape[0] == module.in_features and module.weight.shape[1] == module.out_features:
+                # Weight is [in_features, out_features], transpose delta
+                delta = delta.T
+            else:
+                # Shape mismatch - skip this LoRA
+                return
+        
+        # Add delta to the original weight
+        with torch.no_grad():
+            module.weight.data.add_(delta)
+
+        # Store references for reset
+        if not hasattr(model, "_lora_slots"):
+            model._lora_slots = {}
+        slot = model._lora_slots.setdefault(module_name, {"type": "standard", "original_weight": module._original_weight})
+        # No need to store individual A/B/alpha/strength for direct modification,
+        # as reset will just restore _original_weight
     else:
-        raise ValueError(f"{module_name}: Unsupported module type {type(module)} (Z-Image requires proj_down/proj_up)")
+        raise ValueError(f"{module_name}: Unsupported module type {type(module)} (Z-Image requires proj_down/proj_up for Nunchaku or weight/in_features/out_features for standard)")
 
 
 def compose_loras_v2(
@@ -395,61 +545,7 @@ def compose_loras_v2(
     Returns:
         bool: True if the LoRA format is supported and processed, False otherwise.
     """
-    logger.info(f"[Z-Image] Composing {len(lora_configs)} LoRAs...")
-    print(f"[Z-Image] Composing {len(lora_configs)} LoRAs...")
     reset_lora_v2(model)
-    _first_detection = None  # Initialize for scope safety
-
-    # DEBUG: Inspect all keys in the first LoRA to help debug missing layers (very noisy)
-    # NOTE: User requirement: do NOT hide/remove logs.
-    # OPTIMIZATION: Cache first LoRA state dict for reuse in processing loop
-    _cached_first_lora_state_dict = None
-    _first_detection = None
-    if lora_configs:
-        first_lora_path_or_dict, first_lora_strength = lora_configs[0]
-        first_lora_state_dict = _load_lora_state_dict(first_lora_path_or_dict)
-        _cached_first_lora_state_dict = first_lora_state_dict  # Cache for reuse
-        logger.info(f"--- DEBUG: Inspecting keys for Z-Image LoRA 1 (Strength: {first_lora_strength}) ---")
-        print(f"--- DEBUG: Inspecting keys for Z-Image LoRA 1 (Strength: {first_lora_strength}) ---")
-
-        # OPTIMIZATION: Check format first. If unsupported (e.g. LoKR/LoHa/SD1.5) without ANY standard keys,
-        # skipping thousands of UNMATCHED log lines prevents severe lag (Github Issue #44).
-        # [USER REQUEST] To restore full logs for unsupported formats, change the condition below to "if True:".
-        _first_detection = _detect_lora_format(first_lora_state_dict)
-
-        # Log format detection for first LoRA (USER REQUEST: log for ALL LoRAs)
-        first_lora_name = first_lora_path_or_dict if isinstance(first_lora_path_or_dict, str) else "dict"
-        try:
-            _log_lora_format_detection(str(first_lora_name), _first_detection)
-        except Exception as e:
-            # Safety: never fail compose due to logging, but log the error for debugging
-            logger.warning(f"Failed to log LoRA format detection for first Z-Image LoRA {first_lora_name}: {e}")
-            print(f"Failed to log LoRA format detection for first Z-Image LoRA {first_lora_name}: {e}")
-            traceback.print_exc()
-
-        if _first_detection["has_standard"]:
-            # Standard format (or mixed): Log EVERYTHING as requested.
-            for key in first_lora_state_dict.keys():
-                parsed_res = _classify_and_map_key(key)
-                if parsed_res:
-                    group, base_key, comp, ab = parsed_res
-                    mapped_name = f"{base_key}.{comp}.{ab}" if comp and ab else (f"{base_key}.{ab}" if ab else base_key)
-                    logger.info(f"Key: {key} -> Mapped to: {mapped_name} (Group: {group})")
-                    print(f"Key: {key} -> Mapped to: {mapped_name} (Group: {group})")
-                else:
-                    logger.warning(f"Key: {key} -> UNMATCHED (Ignored)")
-                    print(f"Key: {key} -> UNMATCHED (Ignored)")
-        else:
-            # Unsupported format only: Skip loop to prevent freeze.
-            logger.warning("⚠️  Unsupported LoRA format detected (No standard keys).")
-            print("⚠️  Unsupported LoRA format detected (No standard keys).")
-            logger.warning(f"   Skipping detailed key inspection of {len(first_lora_state_dict)} keys to prevent console freeze.")
-            print(f"   Skipping detailed key inspection of {len(first_lora_state_dict)} keys to prevent console freeze.")
-            logger.warning("   Note: This LoRA will likely have no effect or will be skipped entirely.")
-            print("   Note: This LoRA will likely have no effect or will be skipped entirely.")
-
-        logger.info("--- DEBUG: End key inspection ---")
-        print("--- DEBUG: End key inspection ---")
 
     aggregated_weights: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
@@ -458,33 +554,27 @@ def compose_loras_v2(
 
     # 1. Aggregate weights from all LoRAs
     for idx, (lora_path_or_dict, strength) in enumerate(lora_configs):
-        lora_name = lora_path_or_dict if isinstance(lora_path_or_dict, str) else "dict"
-        # OPTIMIZATION: Reuse cached first LoRA state dict to avoid duplicate file I/O
-        if idx == 0 and _cached_first_lora_state_dict is not None:
-            lora_state_dict = _cached_first_lora_state_dict
+        # Get lora_name from path or dict
+        if isinstance(lora_path_or_dict, (str, Path)):
+            lora_name = Path(lora_path_or_dict).stem
         else:
-            lora_state_dict = _load_lora_state_dict(lora_path_or_dict)
-
-        # LoRA format detection + detailed logging (v2.2.3)
-        try:
-            detection = _detect_lora_format(lora_state_dict)
-            _log_lora_format_detection(str(lora_name), detection)
-        except Exception as e:
-            # Safety: never fail compose due to logging, but log the error for debugging
-            logger.warning(f"Failed to log LoRA format detection for Z-Image LoRA {lora_name}: {e}")
-            print(f"Failed to log LoRA format detection for Z-Image LoRA {lora_name}: {e}")
-            traceback.print_exc()
+            lora_name = f"LoRA_{idx}"
+        lora_state_dict = _load_lora_state_dict(lora_path_or_dict)
 
         lora_grouped: Dict[str, Dict[str, torch.Tensor]] = defaultdict(dict)
         for key, value in lora_state_dict.items():
-            parsed = _classify_and_map_key(key)
+            # Use Nunchaku mapping for Nunchaku models, standard ZIT mapping for standard ZIT
+            if has_w13:
+                parsed = _classify_and_map_key(key)
+            else:
+                parsed = _classify_and_map_key_standard_zit(key)
+            
             if parsed is None:
                 continue
 
             group, base_key, comp, ab = parsed
             # Skip if unpatched w1/w3 when model is patched (has w13)
             if has_w13 and base_key.endswith((".feed_forward.w1", ".feed_forward.w3")):
-                logger.debug(f"[Z-Image] Skipping unpatched key {key} (model has w13)")
                 continue
 
             if group in ("qkv", "glu") and comp is not None:
@@ -517,38 +607,48 @@ def compose_loras_v2(
     for module_name, parts in aggregated_weights.items():
         resolved_name, module = _resolve_module_name(model, module_name)
         if module is None:
-            logger.debug(f"[Z-Image] [MISS] Module not found: {module_name} (resolved: {resolved_name})")
             continue
 
-        if not (hasattr(module, "proj_down") and hasattr(module, "proj_up")):
-            logger.info(f"[Z-Image] [MISS] Module found but unsupported/missing proj_down/proj_up: {resolved_name} (Type: {type(module)})")
-            print(f"[Z-Image] [MISS] Module found but unsupported/missing proj_down/proj_up: {resolved_name} (Type: {type(module)})")
+        # Check if module supports LoRA (Nunchaku: proj_down/proj_up, Standard: weight/in_features/out_features)
+        is_nunchaku = hasattr(module, "proj_down") and hasattr(module, "proj_up")
+        is_standard = hasattr(module, "weight") and hasattr(module, "in_features") and hasattr(module, "out_features")
+        
+        if not (is_nunchaku or is_standard):
             continue
 
-        all_A = []
-        all_B_scaled = []
-        for part in parts:
-            A, B, alpha, strength = part["A"], part["B"], part["alpha"], part["strength"]
-            r_lora = A.shape[0]
-            scale_alpha = alpha.item() if alpha is not None else float(r_lora)
-            scale = strength * (scale_alpha / max(1.0, float(r_lora)))
+        # Aggregate LoRA weights
+        if is_nunchaku:
+            # Nunchaku: Aggregate all LoRAs and apply as single delta
+            all_A = []
+            all_B_scaled = []
+            for part in parts:
+                A, B, alpha, strength = part["A"], part["B"], part["alpha"], part["strength"]
+                r_lora = A.shape[0]
+                scale_alpha = alpha.item() if alpha is not None else float(r_lora)
+                scale = strength * (scale_alpha / max(1.0, float(r_lora)))
 
-            target_dtype = module.proj_down.dtype
-            target_device = module.proj_down.device
+                target_dtype = module.proj_down.dtype
+                target_device = module.proj_down.device
 
-            all_A.append(A.to(dtype=target_dtype, device=target_device))
-            all_B_scaled.append((B * scale).to(dtype=target_dtype, device=target_device))
+                all_A.append(A.to(dtype=target_dtype, device=target_device))
+                all_B_scaled.append((B * scale).to(dtype=target_dtype, device=target_device))
 
-        if not all_A:
-            continue
+            if not all_A:
+                continue
 
-        final_A = torch.cat(all_A, dim=0)
-        final_B = torch.cat(all_B_scaled, dim=1)
+            final_A = torch.cat(all_A, dim=0)
+            final_B = torch.cat(all_B_scaled, dim=1)
 
-        _apply_lora_to_module(module, final_A, final_B, resolved_name, model)
-        logger.info(f"[Z-Image] [APPLY] LoRA applied to: {resolved_name}")
-        print(f"[Z-Image] [APPLY] LoRA applied to: {resolved_name}")
-        applied_modules_count += 1
+            _apply_lora_to_module(module, final_A, final_B, resolved_name, model)
+            logger.info(f"[Z-Image] [APPLY] LoRA applied to: {resolved_name}")
+            print(f"[Z-Image] [APPLY] LoRA applied to: {resolved_name}")
+            applied_modules_count += 1
+        else:
+            # Standard ZIT: Apply each LoRA individually via direct weight modification
+            for part in parts:
+                A, B, alpha, strength = part["A"], part["B"], part["alpha"], part["strength"]
+                _apply_lora_to_module(module, A, B, resolved_name, model, strength=strength, alpha=alpha)
+            applied_modules_count += 1
 
     logger.info(f"[Z-Image] Applied LoRA compositions to {applied_modules_count} modules.")
     print(f"[Z-Image] Applied LoRA compositions to {applied_modules_count} modules.")
@@ -591,6 +691,12 @@ def reset_lora_v2(model: nn.Module) -> None:
                  module.proj_down.data = pack_lowrank_weight(pd_reset, down=True)
                  module.proj_up.data = pack_lowrank_weight(pu_reset, down=False)
                  module.rank = base_rank
+        elif module_type == "standard":
+            # Standard ZIT: Restore original weight
+            if hasattr(module, "_original_weight") and module._original_weight is not None:
+                with torch.no_grad():
+                    module.weight.data.copy_(module._original_weight)
+                del module._original_weight
             
     model._lora_slots.clear()
     model._lora_strength = 1.0
