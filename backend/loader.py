@@ -353,6 +353,10 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
             if _nz:
                 model = patch_nunchaku_zimage(model, precision, rank)
+            elif cls_name in ("Lumina2Transformer2DModel", "ZImageTransformer2DModel"):
+                # Standard ZIT: Apply LoRA support (same as Nunchaku ZIT but without Nunchaku-specific patching)
+                from backend.nn.svdq import patch_standard_zimage
+                model = patch_standard_zimage(model)
             load_state_dict(model, state_dict)
 
             if hasattr(model, "_internal_dict"):

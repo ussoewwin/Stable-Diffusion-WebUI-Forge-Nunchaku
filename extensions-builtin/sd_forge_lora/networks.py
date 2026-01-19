@@ -18,9 +18,15 @@ from modules import errors, scripts, sd_models, shared
 
 
 def load_lora_for_models(model: "UnetPatcher", clip, lora, strength_model, strength_clip, filename="default", online_mode=False):
-    if dynamic_args.get("nunchaku", False):
-        model.model.diffusion_model.loras.append((filename, strength_model))
-        return model, clip
+    # Check for ZIT models (both Nunchaku and standard) - detected by NextDiT instance
+    if hasattr(model.model, "diffusion_model"):
+        from comfy.ldm.lumina.model import NextDiT
+        if isinstance(model.model.diffusion_model, NextDiT):
+            # Ensure loras attribute exists (for standard ZIT models)
+            if not hasattr(model.model.diffusion_model, "loras"):
+                model.model.diffusion_model.loras = []
+            model.model.diffusion_model.loras.append((filename, strength_model))
+            return model, clip
 
     model_flag: str = type(model.model).__name__ if model is not None else "default"
 
@@ -130,8 +136,13 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
     current_sd.forge_objects.unet = current_sd.forge_objects_original.unet
     current_sd.forge_objects.clip = current_sd.forge_objects_original.clip
 
-    if dynamic_args.get("nunchaku", False):
-        if hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
+    # Clear loras for ZIT models (both Nunchaku and standard) - detected by NextDiT instance
+    if hasattr(current_sd.forge_objects.unet.model, "diffusion_model"):
+        from comfy.ldm.lumina.model import NextDiT
+        if isinstance(current_sd.forge_objects.unet.model.diffusion_model, NextDiT):
+            # Ensure loras attribute exists (for standard ZIT models)
+            if not hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
+                current_sd.forge_objects.unet.model.diffusion_model.loras = []
             current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
 
     for filename, strength_model, strength_clip, online_mode in compiled_lora_targets:

@@ -1107,3 +1107,64 @@ def patch_nunchaku_zimage(model: NextDiT, precision: str, rank: int):
     model.load_state_dict = load_state_dict
 
     return model
+
+
+def patch_standard_zimage(model: NextDiT):
+    """
+    Patch standard Z-Image (ZIT) model for LoRA support.
+    Same as patch_nunchaku_zimage but without Nunchaku-specific transformer block patching.
+    """
+    # Add loras attribute for LoRA support (Z-Image only)
+    if not hasattr(model, "loras"):
+        model.loras = []
+    if not hasattr(model, "_applied_loras"):
+        model._applied_loras = []
+    
+    # Patch forward method to apply LoRA (Z-Image only)
+    if not hasattr(model, "_original_forward_patched_for_lora"):
+        model._original_forward = model.forward
+        def _forward_with_lora(*args, **kwargs):
+            # Apply LoRA if needed (Z-Image only)
+            # Robust LoRA change detection: compare list lengths and contents (deep comparison)
+            # This ensures LoRA is reapplied when model is reloaded or LoRA config changes
+            loras_changed = (
+                len(model.loras) != len(model._applied_loras) or
+                any(
+                    (lora_path != applied_path or lora_strength != applied_strength)
+                    for (lora_path, lora_strength), (applied_path, applied_strength)
+                    in zip(model.loras, model._applied_loras)
+                )
+            )
+
+            if loras_changed:
+                # Update _applied_loras to match current loras (deep copy to avoid reference issues)
+                model._applied_loras = [(path, strength) for path, strength in model.loras]
+                reset_zimage_lora_v2(model)
+                print(f"[Z-Image] Composing {len(model.loras)} LoRA(s)...")
+                if len(model.loras) > 0:
+                    compose_zimage_loras_v2(model, model.loras)
+                    print("[Z-Image] LoRAs Composed~")
+                else:
+                    print("[Z-Image] No LoRAs to compose (all cleared)")
+            return model._original_forward(*args, **kwargs)
+        model.forward = _forward_with_lora
+        model._original_forward_patched_for_lora = True
+
+    _load_state_dict: Callable = model.load_state_dict
+
+    @wraps(_load_state_dict)
+    def load_state_dict(sd, *args, **kwargs):
+        result = _load_state_dict(sd, *args, **kwargs)
+        # Apply Z-Image specific LoRAs after state dict is loaded
+        if model.loras != model._applied_loras:
+            model._applied_loras = [(path, strength) for path, strength in model.loras]
+            reset_zimage_lora_v2(model)
+            if len(model.loras) > 0:
+                print(f"[Z-Image] Applying {len(model.loras)} LoRA(s) after model load...")
+                compose_zimage_loras_v2(model, model.loras)
+                print("[Z-Image] LoRAs Applied~")
+        return result
+
+    model.load_state_dict = load_state_dict
+
+    return model
