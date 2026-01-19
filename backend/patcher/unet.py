@@ -25,6 +25,34 @@ class UnetPatcher(ModelPatcher):
         self.extra_preserved_memory_during_sampling = 0
         self.extra_model_patchers_during_sampling = []
         self.extra_concat_condition = None
+    
+    def set_model_patch(self, patch, name):
+        # ZIT-ONLY FIX: For ZIT patches (noise_refiner/double_block), register to BOTH:
+        # 1. self.model_options (UnetPatcher's) - used by sampling_function.py
+        # 2. self.model.model_options (KModel's) - used by KModel.apply_model
+        # This ensures patches flow correctly through the sampling pipeline.
+        # Non-ZIT patches only go to KModel.model_options for backward compatibility.
+        
+        is_zit_patch = name in ("noise_refiner", "double_block")
+        
+        if is_zit_patch:
+            # ZIT patch: Register to UnetPatcher.model_options for sampling_function flow
+            if "transformer_options" not in self.model_options:
+                self.model_options["transformer_options"] = {}
+            to = self.model_options["transformer_options"]
+            if "patches" not in to:
+                to["patches"] = {}
+            to["patches"][name] = to["patches"].get(name, []) + [patch]
+        
+        # Also register to KModel.model_options (original logic for compatibility)
+        if hasattr(self.model, 'model_options'):
+            to = self.model.model_options["transformer_options"]
+            if "patches" not in to:
+                to["patches"] = {}
+            to["patches"][name] = to["patches"].get(name, []) + [patch]
+        else:
+            # Fallback to parent implementation
+            super().set_model_patch(patch, name)
 
     def clone(self):
         n = UnetPatcher(self.model, self.load_device, self.offload_device, self.size, self.current_device)

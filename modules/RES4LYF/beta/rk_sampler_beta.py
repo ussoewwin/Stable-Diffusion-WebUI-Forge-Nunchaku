@@ -283,7 +283,8 @@ def sample_rk_beta(
     is_nunchaku_flux1 = False
     is_nunchaku_sdxl = False
     is_sdxl = False
-    
+    is_flux1 = False
+
     # First, try Forge path (ForgeDiffusionEngine has forge_objects)
     if hasattr(model, "inner_model") and hasattr(model.inner_model, "inner_model"):
         inner_model = model.inner_model.inner_model
@@ -316,25 +317,35 @@ def sample_rk_beta(
                                             is_sdxl = True
                                 except (ImportError, TypeError):
                                     pass
+                                # Check if it's standard Flux1 (IntegratedFluxTransformer2DModel)
+                                if not is_sdxl:  # Only check Flux1 if not SDXL
+                                    try:
+                                        from backend.nn.flux import IntegratedFluxTransformer2DModel
+                                        if isinstance(diffusion_model, IntegratedFluxTransformer2DModel):
+                                            is_flux1 = True
+                                    except (ImportError, TypeError):
+                                        pass
                         except (ImportError, TypeError):
                             pass
-                    
-                    if hasattr(k_model, "model_sampling"):
-                        model_sampling_obj = k_model.model_sampling
-                        if is_nunchaku_qwen_image:
-                            model_type_str = "Nunchaku QwenImage"
-                        elif is_nunchaku_flux1:
-                            model_type_str = "Nunchaku FLUX1"
-                        elif is_nunchaku_sdxl:
-                            model_type_str = "Nunchaku SDXL"
-                        elif is_sdxl:
-                            model_type_str = "SDXL"
-                        else:
-                            model_type_str = "Forge"
-                        model_sampling_path = f"forge_objects.unet.model.model_sampling ({model_type_str})"
+                        
+                        if hasattr(k_model, "model_sampling"):
+                            model_sampling_obj = k_model.model_sampling
+                            if is_nunchaku_qwen_image:
+                                model_type_str = "Nunchaku QwenImage"
+                            elif is_nunchaku_flux1:
+                                model_type_str = "Nunchaku FLUX1"
+                            elif is_nunchaku_sdxl:
+                                model_type_str = "Nunchaku SDXL"
+                            elif is_sdxl:
+                                model_type_str = "SDXL"
+                            elif is_flux1:
+                                model_type_str = "FLUX1"
+                            else:
+                                model_type_str = "Forge"
+                            model_sampling_path = f"forge_objects.unet.model.model_sampling ({model_type_str})"
             except (AttributeError, TypeError):
                 pass
-    
+
     # Fallback: ComfyUI BaseModel (has model_sampling directly)
     if model_sampling_obj is None:
         try:
@@ -342,7 +353,7 @@ def sample_rk_beta(
             model_sampling_path = "model.inner_model.inner_model.model_sampling (ComfyUI BaseModel)"
         except (AttributeError, TypeError):
             pass
-    
+
     if model_sampling_obj is None:
         # Try model.inner_model.model_sampling (if model_wrap has it directly)
         try:
@@ -350,7 +361,7 @@ def sample_rk_beta(
             model_sampling_path = "model.inner_model.model_sampling"
         except (AttributeError, TypeError):
             pass
-    
+
     if model_sampling_obj is None:
         # Try model.model_sampling (fallback)
         try:
@@ -358,14 +369,14 @@ def sample_rk_beta(
             model_sampling_path = "model.model_sampling"
         except (AttributeError, TypeError):
             pass
-    
+
     # Check if model_sampling is EPS type (VE model) or CONST type (FLUX1)
     # ModelSamplingFluxWithConst uses backend.modules.k_model.CONST, not comfy.model_sampling.CONST
     try:
         from backend.modules.k_model import CONST as BackendCONST
     except ImportError:
         BackendCONST = None
-    
+
     VE_MODEL = False
     CONST_MODEL = False
     if model_sampling_obj is not None:
@@ -379,6 +390,8 @@ def sample_rk_beta(
             model_type_str = "Nunchaku SDXL"
         elif is_sdxl:
             model_type_str = "SDXL"
+        elif is_flux1:
+            model_type_str = "FLUX1"
         else:
             model_type_str = "Other"
         RESplain(f"[RES4LYF] model_type: {model_type_str}, model_sampling at: {model_sampling_path}, type: {type(model_sampling_obj).__name__}, VE_MODEL: {VE_MODEL}, CONST_MODEL: {CONST_MODEL}", debug=False)
@@ -391,6 +404,8 @@ def sample_rk_beta(
             model_type_str = "Nunchaku SDXL"
         elif is_sdxl:
             model_type_str = "SDXL"
+        elif is_flux1:
+            model_type_str = "FLUX1"
         else:
             model_type_str = "Other"
         raise AttributeError(f"model_sampling not found. Model type: {model_type_str}. Tried: forge_objects.unet.model.model_sampling (Forge), model.inner_model.inner_model.model_sampling (ComfyUI BaseModel), model.inner_model.model_sampling, model.model_sampling")

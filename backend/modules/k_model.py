@@ -5,6 +5,10 @@ import torch
 from backend import memory_management
 from backend.modules.k_prediction import k_prediction_from_diffusers_scheduler
 
+# Import comfy modules for WrapperExecutor
+import comfy.patcher_extension
+import comfy.ldm.lumina.model  # For NextDiT check in apply_model
+
 
 def reshape_sigma(sigma, noise_dim):
     if sigma.nelement() == 1:
@@ -128,8 +132,82 @@ class KModel(torch.nn.Module):
                 self.model_sampling = None
         else:
             self.model_sampling = None
+        
+        # Initialize model_options for transformer_options (used by ControlNet patches, etc.)
+        self.model_options = {"transformer_options": {}}
 
-    def apply_model(self, x, t, c_concat=None, c_crossattn=None, control=None, transformer_options={}, **kwargs):
+    def apply_model(self, x, t, c_concat=None, c_crossattn=None, control=None, transformer_options=None, **kwargs):
+        # Use WrapperExecutor same as ComfyUI BaseModel.apply_model
+        # This ensures APPLY_MODEL level wrappers are executed
+        if transformer_options is None:
+            transformer_options = {}
+        
+        # ZIT-ONLY FIX: Handle ZIT patches to prevent double application and stale patches
+        # 
+        # Problem 1: Double application - ZIT patches exist in both provided_patches AND self_patches
+        # Solution: Skip self.model_options merge when ZIT patches are already in provided_patches
+        #
+        # Problem 2: Stale patches - After model switch, ZIT patches remain in self_patches
+        #            but no new ZIT patches are in provided_patches, causing RecursionError
+        # Solution: Clear self.model_options ZIT patches when detected as stale
+        #
+        # This fix ONLY affects NextDiT models - other models use the original merge logic.
+        skip_model_options_merge = False
+        provided_patches = transformer_options.get("patches", {})
+        zit_patches_in_provided = "noise_refiner" in provided_patches or "double_block" in provided_patches
+        
+        # Get current model type and self patches
+        model_type_name = type(self.diffusion_model).__name__
+        self_patches = self.model_options.get("transformer_options", {}).get("patches", {})
+        zit_patches_in_self = "noise_refiner" in self_patches or "double_block" in self_patches
+        
+        # Case 1: ZIT patches in provided - skip merge to prevent duplication
+        if zit_patches_in_provided and model_type_name == "NextDiT":
+            skip_model_options_merge = True
+        
+        # Case 2: Stale ZIT patches detected - self has ZIT patches but provided doesn't
+        # This happens after model switch: old patches remain in self.model_options
+        elif zit_patches_in_self and not zit_patches_in_provided:
+            # Clear the stale transformer_options to prevent applying old patches
+            self.model_options["transformer_options"] = {}
+            skip_model_options_merge = True  # Nothing to merge now
+        
+        # Merge transformer_options from model_options before passing to WrapperExecutor
+        # Same as ComfyUI: model_options["transformer_options"] is merged with provided transformer_options
+        final_transformer_options = {}
+        
+        # ZIT-ONLY: Skip self.model_options merge if ZIT patches already in transformer_options
+        if not skip_model_options_merge and "transformer_options" in self.model_options:
+            import copy
+            final_transformer_options = copy.deepcopy(self.model_options["transformer_options"])
+        
+        # Merge with provided transformer_options (from sampling_function_inner)
+        if transformer_options:
+            # Merge patches (same logic as sampling_function.py lines 250-259)
+            if "patches" in transformer_options:
+                if "patches" not in final_transformer_options:
+                    final_transformer_options["patches"] = {}
+                cur_patches = final_transformer_options["patches"].copy()
+                for patch_name, patches in transformer_options["patches"].items():
+                    if patch_name in cur_patches:
+                        cur_patches[patch_name] = cur_patches[patch_name] + patches
+                    else:
+                        cur_patches[patch_name] = patches
+                final_transformer_options["patches"] = cur_patches
+            # Merge other transformer_options (override with provided values)
+            for key, value in transformer_options.items():
+                if key != "patches":
+                    final_transformer_options[key] = value
+        
+        transformer_options = final_transformer_options
+        
+        return comfy.patcher_extension.WrapperExecutor.new_class_executor(
+            self._apply_model,
+            self,
+            comfy.patcher_extension.get_all_wrappers(comfy.patcher_extension.WrappersMP.APPLY_MODEL, transformer_options)
+        ).execute(x, t, c_concat, c_crossattn, control, transformer_options, **kwargs)
+
+    def _apply_model(self, x, t, c_concat=None, c_crossattn=None, control=None, transformer_options={}, **kwargs):
         sigma = t
         xc = self.predictor.calculate_input(sigma, x)
         if c_concat is not None:
@@ -143,13 +221,85 @@ class KModel(torch.nn.Module):
         context = context.to(dtype)
         extra_conds = {}
         for o in kwargs:
+            # Skip transformer_options as it's passed explicitly
+            if o == "transformer_options":
+                continue
             extra = kwargs[o]
             if hasattr(extra, "dtype"):
                 if extra.dtype != torch.int and extra.dtype != torch.long:
                     extra = extra.to(dtype)
             extra_conds[o] = extra
 
-        model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds).float()
+        # Remove transformer_options from extra_conds to avoid duplicate argument
+        extra_conds_clean = {k: v for k, v in extra_conds.items() if k != "transformer_options"}
+        
+        # CRITICAL: Check if this is a ZIT model (NextDiT) BEFORE applying ZIT-specific logic
+        # ZIT models use NextDiT as diffusion_model, other models (SD1.5, SDXL, Flux1, Qwen Image) do NOT
+        is_zit_model = False
+        try:
+            NextDiT = comfy.ldm.lumina.model.NextDiT
+            if isinstance(self.diffusion_model, NextDiT):
+                is_zit_model = True
+            else:
+                # Fallback: check by type name
+                model_type_name = type(self.diffusion_model).__name__
+                if model_type_name == "NextDiT":
+                    is_zit_model = True
+        except (ImportError, AttributeError, TypeError):
+            # If we can't import NextDiT or check, assume it's not a ZIT model
+            is_zit_model = False
+        
+        # ZIT models (NextDiT) ONLY: Apply ComfyUI Lumina2.extra_conds logic for attention_mask and num_tokens
+        # Same as ComfyUI model_base.py Lumina2.extra_conds (lines 1154-1172)
+        # Other models (SD1.5, SDXL, Flux1, Qwen Image): Skip this logic completely
+        if is_zit_model:
+            attention_mask = extra_conds_clean.pop("attention_mask", None)
+            num_tokens = None
+            
+            if attention_mask is not None:
+                # ComfyUI: if torch.numel(attention_mask) != attention_mask.sum():
+                #   out['attention_mask'] = comfy.conds.CONDRegular(attention_mask)
+                # out['num_tokens'] = comfy.conds.CONDConstant(max(1, torch.sum(attention_mask).item()))
+                if torch.numel(attention_mask) != attention_mask.sum():
+                    # attention_mask has zeros, keep it
+                    extra_conds_clean["attention_mask"] = attention_mask
+                num_tokens = max(1, torch.sum(attention_mask).item())
+            
+            # ComfyUI: cross_attn = kwargs.get("cross_attn", None)
+            # if cross_attn is not None:
+            #     out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+            #     if 'num_tokens' not in out:
+            #         out['num_tokens'] = comfy.conds.CONDConstant(cross_attn.shape[1])
+            # Note: Forge uses c_crossattn parameter instead of cross_attn in kwargs
+            if num_tokens is None and context is not None and hasattr(context, 'shape') and len(context.shape) >= 2:
+                # Fallback: calculate num_tokens from context shape
+                num_tokens = context.shape[1]
+            elif "num_tokens" in extra_conds_clean:
+                # Use num_tokens from kwargs if explicitly provided
+                num_tokens = extra_conds_clean.pop("num_tokens")
+            
+            # CRITICAL: transformer_options must be in kwargs for NextDiT.forward() to get wrappers
+            # NextDiT.forward() uses kwargs.get("transformer_options", {}) to get wrappers
+            # Even though _forward() accepts transformer_options as explicit argument,
+            # the WrapperExecutor in forward() needs it in kwargs
+            # BUT: We must NOT pass it as explicit argument AND in kwargs to avoid "multiple values" error
+            # Pass it ONLY in kwargs, not as explicit argument
+            extra_conds_clean["transformer_options"] = transformer_options
+            
+            # Pass transformer_options ONLY in kwargs (not as explicit argument)
+            # This allows NextDiT.forward() to get wrappers via kwargs.get("transformer_options", {})
+            # and _forward() will receive it from kwargs as well
+            # Same as ComfyUI BaseModel._apply_model: model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds)
+            if num_tokens is not None:
+                model_output = self.diffusion_model(xc, t, context=context, num_tokens=num_tokens, attention_mask=attention_mask, control=control, **extra_conds_clean).float()
+            else:
+                # Fallback: try without num_tokens (for models that don't require it)
+                model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
+        else:
+            # Other models (SD1.5, SDXL, Flux1, Qwen Image): Normal forward without ZIT-specific parameters
+            # DO NOT add transformer_options to kwargs, DO NOT pass num_tokens or attention_mask
+            model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
+        
         return self.predictor.calculate_denoised(sigma, model_output, x)
 
     def memory_required(self, input_shape: list[int]) -> float:

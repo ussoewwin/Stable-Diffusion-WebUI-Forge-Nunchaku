@@ -189,6 +189,54 @@ class ModelPatcher:
     def set_model_output_block_patch(self, patch):
         self.set_model_patch(patch, "output_block_patch")
 
+    def set_model_double_block_patch(self, patch):
+        """
+        Set double_block patch for ZIT ControlNet.
+        This method is ZIT models (NextDiT) ONLY.
+        Other models (SD1.5, SDXL, Flux1, Qwen Image) will ignore this patch.
+        """
+        # CRITICAL: Verify this is a ZIT model (NextDiT) before applying patch
+        is_zit_model = False
+        try:
+            import comfy.ldm.lumina.model
+            NextDiT = comfy.ldm.lumina.model.NextDiT
+            if hasattr(self.model, 'diffusion_model'):
+                if isinstance(self.model.diffusion_model, NextDiT):
+                    is_zit_model = True
+                elif type(self.model.diffusion_model).__name__ == "NextDiT":
+                    is_zit_model = True
+        except (ImportError, AttributeError, TypeError):
+            is_zit_model = False
+        
+        if not is_zit_model:
+            return
+        
+        self.set_model_patch(patch, "double_block")
+
+    def set_model_noise_refiner_patch(self, patch):
+        """
+        Set noise_refiner patch for ZIT ControlNet.
+        This method is ZIT models (NextDiT) ONLY.
+        Other models (SD1.5, SDXL, Flux1, Qwen Image) will ignore this patch.
+        """
+        # CRITICAL: Verify this is a ZIT model (NextDiT) before applying patch
+        is_zit_model = False
+        try:
+            import comfy.ldm.lumina.model
+            NextDiT = comfy.ldm.lumina.model.NextDiT
+            if hasattr(self.model, 'diffusion_model'):
+                if isinstance(self.model.diffusion_model, NextDiT):
+                    is_zit_model = True
+                elif type(self.model.diffusion_model).__name__ == "NextDiT":
+                    is_zit_model = True
+        except (ImportError, AttributeError, TypeError):
+            is_zit_model = False
+        
+        if not is_zit_model:
+            return
+        
+        self.set_model_patch(patch, "noise_refiner")
+
     def add_object_patch(self, name, obj):
         self.object_patches[name] = obj
 

@@ -103,6 +103,19 @@ class ControlNetPatcher(ControlModelPatcher):
                 print(f"Failed to load Nunchaku Qwen Image ControlNet: {e}")
                 return None
         
+        # ZIT ControlNet (from model_patches folder)
+        # Detected by 'control_all_x_embedder.2-1.weight' key
+        if 'control_all_x_embedder.2-1.weight' in controlnet_data:
+            try:
+                from modules_forge.supported_controlnet_zit import ZImageControlNetPatcher
+                result = ZImageControlNetPatcher.try_build_from_state_dict(controlnet_data, ckpt_path)
+                if result is not None:
+                    print(f"[ControlNet] Loaded ZIT ControlNet (model patch): {ckpt_path}")
+                return result
+            except Exception as e:
+                print(f"Failed to load ZIT ControlNet: {e}")
+                return None
+        
         # Flux ControlNet (InstantX format)
         if "controlnet_x_embedder.weight" in controlnet_data:
             try:
@@ -240,3 +253,10 @@ class ControlNetPatcher(ControlModelPatcher):
 
 
 add_supported_control_model(ControlNetPatcher)
+
+# Register ZIT ControlNet patcher
+try:
+    from modules_forge.supported_controlnet_zit import ZImageControlNetPatcher
+    add_supported_control_model(ZImageControlNetPatcher)
+except ImportError:
+    pass  # ZIT ControlNet support may not be available

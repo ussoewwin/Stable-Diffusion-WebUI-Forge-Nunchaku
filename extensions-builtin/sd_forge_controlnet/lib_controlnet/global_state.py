@@ -5,6 +5,7 @@ from functools import lru_cache
 
 from modules import shared
 from modules_forge.shared import controlnet_dir, supported_preprocessors
+from modules.paths_internal import models_path
 
 CNET_MODEL_EXTS = {".pt", ".pth", ".ckpt", ".safetensors", ".bin"}
 
@@ -46,7 +47,15 @@ def update_controlnet_filenames():
     )
     extra_paths = (extra_path for extra_path in ext_dirs if extra_path is not None and os.path.exists(extra_path))
 
-    for path in [controlnet_dir, *extra_paths]:
+    # Add model_patches folder for ZIT ControlNet models
+    model_patches_dir = os.path.join(models_path, "model_patches")
+    model_patches_dir = os.path.normpath(model_patches_dir)
+    
+    all_paths = [controlnet_dir, *extra_paths]
+    if os.path.exists(model_patches_dir):
+        all_paths.append(model_patches_dir)
+
+    for path in all_paths:
         found = get_all_models(path, "name")
         controlnet_filename_dict.update(found)
 
