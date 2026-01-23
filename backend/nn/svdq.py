@@ -563,7 +563,21 @@ class NunchakuQwenImageTransformerBlock(nn.Module):
 
         # Get modulation parameters for both streams
         img_mod_params = self.img_mod(temb)  # [B, 6*dim]
+        # --- Manual Planar Injection for AWQ modulation LoRA (Nunchaku Qwen Image ONLY) ---
+        if hasattr(self.img_mod[1], "_nunchaku_lora_bundle"):
+            A, B = self.img_mod[1]._nunchaku_lora_bundle
+            input_tensor = self.img_mod[0](temb)
+            lora = (input_tensor.to(dtype=A.dtype) @ A.t()) @ B.t()
+            img_mod_params = img_mod_params + lora.to(dtype=img_mod_params.dtype, device=img_mod_params.device)
+        # ----------------------------------------------------------------------------------
         txt_mod_params = self.txt_mod(temb)  # [B, 6*dim]
+        # --- Manual Planar Injection for AWQ modulation LoRA (Nunchaku Qwen Image ONLY) ---
+        if hasattr(self.txt_mod[1], "_nunchaku_lora_bundle"):
+            A, B = self.txt_mod[1]._nunchaku_lora_bundle
+            input_tensor = self.txt_mod[0](temb)
+            lora = (input_tensor.to(dtype=A.dtype) @ A.t()) @ B.t()
+            txt_mod_params = txt_mod_params + lora.to(dtype=txt_mod_params.dtype, device=txt_mod_params.device)
+        # ----------------------------------------------------------------------------------
 
         # Nunchaku's mod_params is [B, 6*dim] instead of [B, dim*6]
         img_mod_params = img_mod_params.view(img_mod_params.shape[0], -1, 6).transpose(1, 2).reshape(img_mod_params.shape[0], -1)
