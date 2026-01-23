@@ -2,7 +2,6 @@
 # Updated for ForgeNeo: Uses backend.utils.load_torch_file instead of safetensors.safe_open
 
 import logging
-import os
 import re
 import traceback
 from collections import defaultdict
@@ -20,13 +19,6 @@ from nunchaku.lora.flux.nunchaku_converter import (
 from backend.utils import load_torch_file
 
 logger = logging.getLogger(__name__)
-
-# Safety switch:
-# QwenImage's modulation linears (`img_mod.1` / `txt_mod.1`) are extremely sensitive because their
-# output is reshaped into shift/scale/gate parameters. With AWQ quantization (AWQW4A16Linear),
-# applying LoRA here often results in severe noise. Default to skipping these two layers.
-# Users can override by setting env var `QWENIMAGE_LORA_APPLY_AWQ_MOD=1`.
-_APPLY_AWQ_MOD = str(os.getenv("QWENIMAGE_LORA_APPLY_AWQ_MOD", "0")).strip().lower() in ("1", "true", "yes", "y", "on")
 
 # Active mapping override (used for runtime model-structure switching, e.g. NextDiT).
 # For Qwen Image, this is always None (no switching needed).
@@ -591,6 +583,21 @@ def _handle_proj_out_split(lora_dict: Dict[str, Dict[str, torch.Tensor]], base_k
     return result, consumed
 
 
+def _is_nunchaku_qwen_image_model(model: nn.Module) -> bool:
+    """
+    True iff the model is Nunchaku Qwen Image (backend.nn.svdq.NunchakuQwenImageTransformer2DModel).
+    AWQ and modulation-layer logic MUST run ONLY for this model.
+    Do not affect Flux1, Z-Image, SDXL, or any other model.
+    """
+    if model is None:
+        return False
+    cls = type(model)
+    return (
+        cls.__name__ == "NunchakuQwenImageTransformer2DModel"
+        and "backend.nn" in (cls.__module__ or "")
+    )
+
+
 def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, module_name: str,
                           model: nn.Module) -> None:
     """Helper to append combined LoRA weights to a module."""
@@ -602,16 +609,21 @@ def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, m
     if B.shape[0] != module.out_features:
         raise ValueError(f"{module_name}: B shape {B.shape} mismatch with out_features={module.out_features}")
 
-    # Handle AWQ quantized linear layers (e.g. AWQW4A16Linear) by injecting LoRA in forward path.
-    # NOTE: We avoid importing the class directly; name/path may differ across environments.
-    if (
+    is_awq = (
         module.__class__.__name__ == "AWQW4A16Linear"
         and hasattr(module, "qweight")
         and hasattr(module, "wscales")
         and hasattr(module, "wzeros")
         and hasattr(module, "in_features")
         and hasattr(module, "out_features")
-    ):
+    )
+    # STRICT BRANCH: AWQ handling ONLY for Nunchaku Qwen Image. Skip entirely for Flux1, SDXL, Z-Image, etc.
+    if is_awq and not _is_nunchaku_qwen_image_model(model):
+        return
+
+    # Handle AWQ quantized linear layers (e.g. AWQW4A16Linear) by injecting LoRA in forward path.
+    # NOTE: We avoid importing the class directly; name/path may differ across environments.
+    if is_awq:
         # Save original forward once
         if not hasattr(module, "_lora_original_forward"):
             try:
@@ -924,12 +936,8 @@ def compose_loras_v2(
         # Check if this is img_mod.1 or txt_mod.1
         is_modulation_layer = (".img_mod.1" in resolved_name or ".txt_mod.1" in resolved_name)
 
-        # Skip AWQ modulation layers by default (unless environment variable is set)
-        if is_awq_w4a16 and is_modulation_layer and not _APPLY_AWQ_MOD:
-            logger.warning(
-                f"[SKIP] {resolved_name}: AWQ modulation layer LoRA is disabled by default (prevents noise). "
-                f"Set QWENIMAGE_LORA_APPLY_AWQ_MOD=1 to force-enable."
-            )
+        # STRICT BRANCH: AWQ modulation layers — ONLY for Nunchaku Qwen Image. Skip for all other models.
+        if is_awq_w4a16 and is_modulation_layer and not _is_nunchaku_qwen_image_model(model):
             continue
 
         # Supported module types:
@@ -959,9 +967,9 @@ def compose_loras_v2(
             elif ".single_transformer_blocks." in resolved_name and ".norm.linear" in resolved_name:
                 B = reorder_adanorm_lora_up(B, splits=3)
 
-            # Special reorder for modulation layers when force-enabled:
+            # Special reorder for modulation layers: ONLY when Nunchaku Qwen Image (Manual Planar Injection path).
             # Reorder B to match modulation channel layout (shift/scale/gate × 2).
-            if is_awq_w4a16 and is_modulation_layer and _APPLY_AWQ_MOD:
+            if is_awq_w4a16 and is_modulation_layer and _is_nunchaku_qwen_image_model(model):
                 # Expect out_features divisible by 6
                 if B.shape[0] % 6 == 0:
                     try:
@@ -1002,10 +1010,26 @@ def compose_loras_v2(
         final_A = torch.cat(all_A, dim=0)
         final_B = torch.cat(all_B_scaled, dim=1)
 
-        _apply_lora_to_module(module, final_A, final_B, resolved_name, model)
-        logger.info(f"[APPLY] LoRA applied to: {resolved_name}")
-        print(f"[APPLY] LoRA applied to: {resolved_name}")
-        applied_modules_count += 1
+        # STRICT BRANCH: AWQ modulation layers — Manual Planar Injection ONLY for Nunchaku Qwen Image.
+        if is_awq_w4a16 and is_modulation_layer and _is_nunchaku_qwen_image_model(model):
+            logger.info(f"[AWQ_MOD] {resolved_name}: Storing LoRA weights for manual Planar injection")
+            mod = module
+            mod._nunchaku_lora_bundle = (final_A, final_B)
+            if hasattr(mod, "_lora_original_forward"):
+                mod.forward = mod._lora_original_forward
+                del mod._lora_original_forward
+            mod._is_modulation_layer = True
+            if not hasattr(model, "_lora_slots"):
+                model._lora_slots = {}
+            model._lora_slots[resolved_name] = {"type": "awq_mod_layer"}
+            logger.info(f"[APPLY] LoRA stored for manual injection: {resolved_name}")
+            print(f"[APPLY] LoRA stored for manual injection: {resolved_name}")
+            applied_modules_count += 1
+        else:
+            _apply_lora_to_module(module, final_A, final_B, resolved_name, model)
+            logger.info(f"[APPLY] LoRA applied to: {resolved_name}")
+            print(f"[APPLY] LoRA applied to: {resolved_name}")
+            applied_modules_count += 1
 
     total_loras = len(lora_configs)
     # Always output the existing log message
@@ -1064,12 +1088,11 @@ def reset_lora_v2(model: nn.Module) -> None:
                     module.weight.data.copy_(info["original_weight"].to(module.weight.device))
 
         elif module_type == "awq_w4a16":
-            # Restore original forward and remove attached LoRA tensors
+            # Restore original forward and remove attached LoRA tensors (Qwen Image AWQ non-mod layers only)
             if hasattr(module, "_lora_original_forward"):
                 try:
                     module.forward = module._lora_original_forward
                 except Exception:
-                    # Safety: never fail reset
                     pass
             for attr in ("_lora_A", "_lora_B", "_lora_original_forward"):
                 if hasattr(module, attr):
@@ -1077,7 +1100,16 @@ def reset_lora_v2(model: nn.Module) -> None:
                         delattr(module, attr)
                     except Exception:
                         pass
-            
+
+        elif module_type == "awq_mod_layer":
+            # Remove LoRA bundle from AWQ modulation layer (Qwen Image only)
+            for attr in ("_nunchaku_lora_bundle", "_is_modulation_layer"):
+                if hasattr(module, attr):
+                    try:
+                        delattr(module, attr)
+                    except Exception:
+                        pass
+
     model._lora_slots.clear()
     model._lora_strength = 1.0
     logger.info("All LoRA weights have been reset from the model.")

@@ -18,6 +18,32 @@ from modules import errors, scripts, sd_models, shared
 
 
 def load_lora_for_models(model: "UnetPatcher", clip, lora, strength_model, strength_clip, filename="default", online_mode=False):
+    # Check for Nunchaku Qwen Image models - detected by NunchakuQwenImageTransformer2DModel instance
+    if hasattr(model.model, "diffusion_model"):
+        try:
+            from backend.nn.svdq import NunchakuQwenImageTransformer2DModel
+            if isinstance(model.model.diffusion_model, NunchakuQwenImageTransformer2DModel):
+                # Ensure loras attribute exists
+                if not hasattr(model.model.diffusion_model, "loras"):
+                    model.model.diffusion_model.loras = []
+                model.model.diffusion_model.loras.append((filename, strength_model))
+                return model, clip
+        except ImportError:
+            pass
+
+    # Check for Nunchaku Flux1 models - detected by SVDQFluxTransformer2DModel instance
+    if hasattr(model.model, "diffusion_model"):
+        try:
+            from backend.nn.svdq import SVDQFluxTransformer2DModel
+            if isinstance(model.model.diffusion_model, SVDQFluxTransformer2DModel):
+                # Ensure loras attribute exists (same format as ComfyUI-nunchaku: (lora_path, strength))
+                if not hasattr(model.model.diffusion_model, "loras"):
+                    model.model.diffusion_model.loras = []
+                model.model.diffusion_model.loras.append((filename, strength_model))
+                return model, clip
+        except ImportError:
+            pass
+    
     # Check for ZIT models (both Nunchaku and standard) - detected by NextDiT instance
     if hasattr(model.model, "diffusion_model"):
         from comfy.ldm.lumina.model import NextDiT
@@ -135,6 +161,29 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
     current_sd.current_lora_hash = compiled_lora_targets_hash
     current_sd.forge_objects.unet = current_sd.forge_objects_original.unet
     current_sd.forge_objects.clip = current_sd.forge_objects_original.clip
+
+    # Clear loras for Nunchaku Qwen Image models
+    if hasattr(current_sd.forge_objects.unet.model, "diffusion_model"):
+        try:
+            from backend.nn.svdq import NunchakuQwenImageTransformer2DModel
+            if isinstance(current_sd.forge_objects.unet.model.diffusion_model, NunchakuQwenImageTransformer2DModel):
+                # Ensure loras attribute exists
+                if not hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
+                    current_sd.forge_objects.unet.model.diffusion_model.loras = []
+                current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
+        except ImportError:
+            pass
+
+    # Clear loras for Nunchaku Flux1 models
+    if hasattr(current_sd.forge_objects.unet.model, "diffusion_model"):
+        try:
+            from backend.nn.svdq import SVDQFluxTransformer2DModel
+            if isinstance(current_sd.forge_objects.unet.model.diffusion_model, SVDQFluxTransformer2DModel):
+                if not hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
+                    current_sd.forge_objects.unet.model.diffusion_model.loras = []
+                current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
+        except ImportError:
+            pass
 
     # Clear loras for ZIT models (both Nunchaku and standard) - detected by NextDiT instance
     if hasattr(current_sd.forge_objects.unet.model, "diffusion_model"):
