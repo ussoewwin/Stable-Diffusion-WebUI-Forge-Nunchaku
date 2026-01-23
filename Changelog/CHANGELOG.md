@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 1.3.5
+
+- **Enhanced Nunchaku LoRA implementation and documentation**
+  - Improved LoRA support for Nunchaku Qwen Image with AWQ quantization layer handling
+  - Enhanced Manual Planar Injection for AWQ modulation layers (img_mod/txt_mod) in Qwen Image models
+  - Strict model type detection to ensure AWQ modifications only apply to Nunchaku Qwen Image models
+  - Complete separation of LoRA paths for Qwen Image, Flux1, SDXL, and Z-Image models
+  - Fixed LoRA application flow with proper model detection and routing
+  - Comprehensive documentation of the modification architecture and processing flow
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.3.5) for complete technical details
+
 ## Version 1.3.1
 
 - **Added Diffsynth Union ControlNet support for ZIT (standard and Nunchaku)**
