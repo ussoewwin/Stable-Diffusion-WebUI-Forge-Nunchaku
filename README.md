@@ -146,7 +146,7 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 
 | Version | Summary |
 |---------|---------|
-| **1.3.6** | ADetailer: prevent duplicate face passes per image; comments in English. Loader: skip Qwen3 when state dict empty (avoids error on SDXL misdetection). |
+| **1.3.6** | ADetailer: prevent duplicate face passes per image. Loader: skip Qwen3 when state dict empty (avoids error on SDXL misdetection). |
 | 1.3.5 | Nunchaku LoRA: AWQ handling, Qwen Image / Flux / SDXL / Z-Image path separation |
 | 1.3.1 | Diffsynth Union ControlNet for Z-Image Turbo (standard and Nunchaku) |
 | 1.3.0 | RES4LYF sampler support for all model types |

@@ -337,8 +337,9 @@ def model_config_from_unet_config(unet_config, state_dict=None):
 def model_config_from_unet(state_dict, unet_key_prefix, use_base_if_no_match=False):
     unet_config = detect_unet_config(state_dict, unet_key_prefix)
     if unet_config is None:
-        # Try diffusers format
-        unet_config = unet_config_from_diffusers_unet(state_dict)
+        # Try diffusers format - strip prefix since unet_config_from_diffusers_unet expects unprefixed keys
+        unet_sd = {k[len(unet_key_prefix):]: v for k, v in state_dict.items() if k.startswith(unet_key_prefix)}
+        unet_config = unet_config_from_diffusers_unet(unet_sd)
         if unet_config is None:
             return None
     model_config = model_config_from_unet_config(unet_config, state_dict)
