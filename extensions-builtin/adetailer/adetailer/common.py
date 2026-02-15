@@ -39,11 +39,11 @@ class PredictOutput(Generic[T]):
 
 
 def hf_download(file: str, repo_id: str = REPO_ID, check_remote: bool = True) -> str:
-    # face_yolov8n.ptは除外（YOLOv11に置き換え済み）
+    # face_yolov8n.pt excluded (replaced by YOLOv11)
     if file == "face_yolov8n.pt":
         return "INVALID"
     
-    # まずローカルファイルを確認（複数の可能性のあるパスをチェック）
+    # Check local paths first
     possible_paths = [
         Path("extensions/adetailer/models") / file,
         Path("models/adetailer") / file,

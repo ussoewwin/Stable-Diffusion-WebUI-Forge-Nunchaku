@@ -14,15 +14,13 @@ from adetailer.args import ALL_ARGS, MASK_MERGE_INVERT
 from controlnet_ext import controlnet_exists, controlnet_type, get_cn_models
 
 def get_cn_module_choices():
-    """遅延評価でControlNetモジュールの選択肢を取得"""
+    """Lazy-eval ControlNet module choices"""
     if controlnet_type == "forge":
         try:
             from lib_controlnet import global_state
             
-            # supported_preprocessorsが初期化されているか確認
             from modules_forge.shared import supported_preprocessors
             if "None" not in supported_preprocessors:
-                # まだ初期化されていない場合はデフォルト値を返す
                 return get_default_cn_module_choices()
             
             return {
@@ -34,14 +32,13 @@ def get_cn_module_choices():
                 "depth": list(global_state.get_filtered_preprocessors("Depth")),
             }
         except (KeyError, AttributeError, ImportError):
-            # エラーが発生した場合はデフォルト値を返す
             return get_default_cn_module_choices()
     else:
         return get_default_cn_module_choices()
 
 
 def get_default_cn_module_choices():
-    """デフォルトのControlNetモジュール選択肢"""
+    """Default ControlNet module choices"""
     return {
         "inpaint": [
             "inpaint_global_harmonious",
@@ -61,12 +58,11 @@ def get_default_cn_module_choices():
     }
 
 
-# 初期化時は関数を定義するだけ
 cn_module_choices_cache = None
 
 
 def get_cn_module_choices_cached():
-    """キャッシュ付きでControlNetモジュール選択肢を取得"""
+    """Cached ControlNet module choices"""
     global cn_module_choices_cache
     if cn_module_choices_cache is None:
         cn_module_choices_cache = get_cn_module_choices()
