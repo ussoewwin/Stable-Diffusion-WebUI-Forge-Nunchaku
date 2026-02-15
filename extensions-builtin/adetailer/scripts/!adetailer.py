@@ -934,11 +934,18 @@ class AfterDetailerScript(scripts.Script):
                 p.scripts.postprocess(copy(p), dummy)
 
         is_processed = False
+        face_already_processed = False  # 同じ画像に顔処理を二重にかけない
         with CNHijackRestore(), pause_total_tqdm(), cn_allow_script_control():
             for n, args in enumerate(arg_list):
                 if args.need_skip():
                     continue
-                is_processed |= self._postprocess_image_inner(p, pp, args, n=n)
+                is_face_tab = "face" in args.ad_model.lower()
+                if is_face_tab and face_already_processed:
+                    continue  # 顔は1回だけ。手など他はそのまま
+                ran = self._postprocess_image_inner(p, pp, args, n=n)
+                if ran and is_face_tab:
+                    face_already_processed = True
+                is_processed |= ran
 
         if is_processed and not is_skip_img2img(p):
             self.save_image(
