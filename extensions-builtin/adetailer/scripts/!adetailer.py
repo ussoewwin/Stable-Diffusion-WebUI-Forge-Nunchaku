@@ -85,19 +85,19 @@ PARAMS_TXT = "params.txt"
 
 no_huggingface = getattr(cmd_opts, "ad_no_huggingface", False)
 
-# Forgeでは、ADetailerモデルはextensions/adetailer/modelsに配置されている
-# 従来のmodels/adetailerディレクトリも確認する
+# Forge: ADetailer models in extensions/adetailer/models
+# Also check legacy models/adetailer
 adetailer_dir = Path(paths.models_path, "adetailer")
 adetailer_ext_dir = Path(__file__).parent.parent / "models"
 
-# 両方のディレクトリを確認
+# Check both dirs
 model_dirs = []
 if adetailer_ext_dir.exists():
     model_dirs.append(adetailer_ext_dir)
 if adetailer_dir.exists():
     model_dirs.append(adetailer_dir)
 
-# ディレクトリが存在しない場合は作成
+# Create dir if missing
 if not model_dirs:
     safe_mkdir(adetailer_dir)
     model_dirs.append(adetailer_dir)
