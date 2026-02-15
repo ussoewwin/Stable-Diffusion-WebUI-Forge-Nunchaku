@@ -153,7 +153,9 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
             return model
         if cls_name == "Qwen3Model":
-            assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have Qwen3 state dict!"
+            if not isinstance(state_dict, dict) or len(state_dict) <= 16:
+                print(f"[Loader] Qwen3Model skipped: state_dict has {len(state_dict) if isinstance(state_dict, dict) else 0} keys. Wrong checkpoint? (SDXL may be misdetected as Qwen)")
+                return None
 
             from backend.nn.llm.llama import Qwen3_4B
 
