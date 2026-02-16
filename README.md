@@ -142,22 +142,6 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 
 **Note:** This implementation is designed specifically for Nunchaku quantization models. For non-quantized Qwen Image models, please use alternative implementations or consider using Nunchaku quantized models instead.
 
-## Changelog
-
-| Version | Summary |
-|---------|---------|
-| **1.3.6** | ADetailer: prevent duplicate face passes per image. Loader: skip Qwen3 when state dict empty (avoids error on SDXL misdetection). |
-| 1.3.5 | Nunchaku LoRA: AWQ handling, Qwen Image / Flux / SDXL / Z-Image path separation |
-| 1.3.1 | Diffsynth Union ControlNet for Z-Image Turbo (standard and Nunchaku) |
-| 1.3.0 | RES4LYF sampler support for all model types |
-| 1.2.1 | Union ControlNet for Nunchaku Qwen Image |
-| 1.2.0 | LoRA support for Nunchaku Qwen Image and Z-Image |
-| 1.1.0 | Union ControlNet for Flux1 and Nunchaku Flux1 |
-| 1.0.7 | ADetailer as built-in extension (InsightFace, YOLOv8/v11) |
-| 1.0.6 | Nunchaku SDXL loader, LoRA, ControlNet |
-
-For full changelog, see [CHANGELOG.md](Changelog/CHANGELOG.md).
-
 ## Base Repositories
 
 This project is built upon the following repositories:
