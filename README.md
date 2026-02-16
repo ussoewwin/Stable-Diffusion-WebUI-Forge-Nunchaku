@@ -142,6 +142,10 @@ These are the standard formats produced by Kohya-ss, Diffusers, and most trainin
 
 **Note:** This implementation is designed specifically for Nunchaku quantization models. For non-quantized Qwen Image models, please use alternative implementations or consider using Nunchaku quantized models instead.
 
+## Changelog
+
+For full changelog, see [CHANGELOG.md](Changelog/CHANGELOG.md).
+
 ## Base Repositories
 
 This project is built upon the following repositories:
