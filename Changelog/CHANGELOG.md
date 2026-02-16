@@ -1,11 +1,14 @@
 # Changelog
 
+## Version 1.3.7
+
+- **Model detection / Qwen3**
+  - When `detect_unet_config` returns None, strip `unet_key_prefix` before diffusers fallback; reduces SDXL–Flux misdetection and downstream VAE shape mismatch (avoids incorrect Qwen3 load path for SDXL)
+
 ## Version 1.3.6
 
 - **ADetailer (built-in extension)**
   - Prevent duplicate face passes per image: only the first face detector tab runs per image; subsequent face tabs are skipped so the same face is not processed twice (hand and other detector tabs unchanged; multiple faces in one image still get one pass each)
-- **Loader**
-  - Skip Qwen3Model load when text_encoder state dict is empty or has very few keys; avoids `AssertionError: You do not have Qwen3 state dict!` when an SDXL checkpoint is misdetected as Qwen/Flux (Z Image Turbo, Flux, Qwen Image unchanged)
 
 ## Version 1.3.5
 
