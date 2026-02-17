@@ -437,6 +437,25 @@ def prepare_environment():
         else:
             startup_timer.record("install nunchaku")
 
+    if not is_installed("iopaint"):
+        try:
+            run_pip("install iopaint --no-deps", "iopaint")
+        except RuntimeError:
+            print("Failed to install iopaint; Please manually install it")
+        else:
+            startup_timer.record("install iopaint")
+
+    if sys.version_info >= (3, 13) and not is_installed("imghdr"):
+        try:
+            run_pip(
+                "install https://huggingface.co/ussoewwin/imghdr-1.0.0-py3-none-any/resolve/main/imghdr-1.0.0-py3-none-any.whl",
+                "imghdr",
+            )
+        except RuntimeError:
+            print("Failed to install imghdr; Please manually install it")
+        else:
+            startup_timer.record("install imghdr")
+
     if args.bnb and not is_installed("bitsandbytes"):
         try:
             run_pip(f"install {bnb_package}", "bitsandbytes")
