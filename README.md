@@ -16,13 +16,6 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
 ### 🎯 Key Features
 
-- **Nunchaku SDXL Support**
-  - Full support for Nunchaku SDXL models with LoRA and ControlNet
-  - Optimized 4-bit quantized SDXL models with SVDQ W4A4 engine (Rank 128)
-  - Automatic model detection and loading
-  - LoRA loader support for Nunchaku SDXL models
-  - ControlNet support for Nunchaku SDXL models
-
 - **LoRA Support for Nunchaku Qwen Image and Z-Image**
   - ✅ **Full LoRA support for Nunchaku Qwen Image (QI) models**
   - ✅ **Full LoRA support for Nunchaku Z-Image (ZIT) models**
@@ -80,20 +73,6 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - ODE version support for non-implicit samplers
   - Robust model detection and handling for both Forge and ComfyUI model structures
   - Automatic CONST and EPS model type detection for proper sampling behavior
-
-## Models
-
-### Nunchaku SDXL Models
-
-Nunchaku SDXL models are available from the following repository:
-
-- **[Nunchaku-R128-SDXL-Series](https://huggingface.co/ussoewwin/Nunchaku-R128-SDXL-Series)**  
-  High-fidelity 4-bit quantized SDXL models optimized using Nunchaku (SVDQ W4A4) engine with Rank 128 (r128) for maximum quality preservation.
-
-**Installation:**
-1. Download the `.safetensors` files from the repository
-2. Place them in `models/Stable-diffusion/` directory
-3. The models will be automatically detected and loaded
 
 ## Known Limitations
 
