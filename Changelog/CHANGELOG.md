@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 1.3.8
+
+- **IoPaint integration**
+  - Auto-install iopaint and imghdr (Python 3.13) in `prepare_environment()`; requirements (python-socketio, typer-config, loguru, rembg); `iopaint-cuda.bat` launcher
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.3.8) for details
+
 ## Version 1.3.7
 
 - **Model detection / Qwen3**
