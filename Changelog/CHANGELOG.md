@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.3.9
+
+- **Config-Presets as built-in extension**
+  - Integrated [Zyin055/Config-Presets](https://github.com/Zyin055/Config-Presets) (MIT) as a built-in extension
+  - Configurable dropdown to switch txt2img/img2img settings in bulk; create/delete presets; custom fields via `*custom-tracked-components.txt`
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.3.9) for details
+
 ## Version 1.3.8
 
 - **IoPaint integration**
