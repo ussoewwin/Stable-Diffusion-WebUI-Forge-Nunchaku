@@ -147,6 +147,9 @@ This project is built upon the following repositories:
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
   ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
 
+- **[Config-Presets](https://github.com/Zyin055/Config-Presets)**  
+  Extension for Automatic1111 - configurable dropdown to change settings in txt2img and img2img tabs by [@Zyin055](https://github.com/Zyin055)
+
 ## License
 
 This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
@@ -161,5 +164,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Apache 2.0
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Apache 2.0
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
+- **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 
 See [LICENSE](LICENSE) file for details.
