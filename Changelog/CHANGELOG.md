@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 1.4.1
+
+- **transformers 5+ compatibility**
+  - Shims for `HybridCache` and `no_init_weights` (removed in transformers 5.x) so that the peft / diffusers / nunchaku import chain does not fail at startup.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.1) for details.
+
 ## Version 1.4.0
 
 - **Improved PEFT format LoRA detection (Nunchaku Qwen Image)**
