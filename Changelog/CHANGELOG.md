@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 1.4.0
+
+- **Improved PEFT format LoRA detection (Nunchaku Qwen Image)**
+  - LoRA files created with Hugging Face PEFT (e.g. `.lora_A.default.weight`) are no longer incorrectly skipped as "unsupported"
+  - Format detection uses partial match so both standard and PEFT key patterns are recognized as Standard LoRA
+  - Log which LoRA files had weights skipped when applicable (e.g. modulation layers apply only to Nunchaku Qwen Image)
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.0) for details
+
 ## Version 1.3.9
 
 - **Config-Presets as built-in extension**
