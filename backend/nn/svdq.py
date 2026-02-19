@@ -874,8 +874,10 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
                 else:
                     control_i = None
                     _scale = 1.0
-                if control_i is not None and i < len(control_i):
-                    add = control_i[i]
+                # Support models with more layers than ControlNet output (e.g. 72 vs 60): cycle control by index
+                if control_i is not None and len(control_i) > 0:
+                    control_idx = i % len(control_i)
+                    add = control_i[control_idx]
                     if add is not None:
                         if (
                             getattr(add, "device", None) != hidden_states.device

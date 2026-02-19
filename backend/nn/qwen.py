@@ -474,12 +474,33 @@ class QwenImageTransformer2DModel(nn.Module):
                     hidden_states = out["img"]
                     encoder_hidden_states = out["txt"]
 
-            if control is not None:  # Controlnet
-                control_i = control.get("input")
-                if i < len(control_i):
-                    add = control_i[i]
-                    if add is not None:
-                        hidden_states[:, : add.shape[1]] += add
+            # ControlNet (same interface as svdq Nunchaku Qwen Image: cycle index, device/dtype/scale)
+            _control = (
+                control
+                if control is not None
+                else (transformer_options.get("control") if isinstance(transformer_options, dict) else None)
+            )
+            if isinstance(_control, dict):
+                control_i = _control.get("input")
+                try:
+                    _scale = float(_control.get("weight", _control.get("scale", 1.0)))
+                except Exception:
+                    _scale = 1.0
+            else:
+                control_i = None
+                _scale = 1.0
+            if control_i is not None and len(control_i) > 0:
+                control_idx = i % len(control_i)
+                add = control_i[control_idx]
+                if add is not None:
+                    if (
+                        getattr(add, "device", None) != hidden_states.device
+                        or getattr(add, "dtype", None) != hidden_states.dtype
+                    ):
+                        add = add.to(device=hidden_states.device, dtype=hidden_states.dtype, non_blocking=True)
+                    t = min(hidden_states.shape[1], add.shape[1])
+                    if t > 0:
+                        hidden_states[:, :t].add_(add[:, :t], alpha=_scale)
 
         hidden_states = self.norm_out(hidden_states, temb)
         hidden_states = self.proj_out(hidden_states)

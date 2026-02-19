@@ -1,11 +1,7 @@
 """
-Nunchaku Qwen Image ControlNet support for Forge.
-This module handles the integration of Qwen Image ControlNet with Forge's
-NunchakuQwenImageTransformer2DModel ONLY.
-
-IMPORTANT: This is for Nunchaku Qwen Image models ONLY.
-- Works with: NunchakuQwenImageTransformer2DModel (from backend.nn.svdq)
-- Does NOT work with: Standard QwenImageTransformer2DModel (from backend.nn.qwen)
+Qwen Image ControlNet support for Forge.
+- Works with: NunchakuQwenImageTransformer2DModel (from backend.nn.svdq), e.g. svdq-fp4_r128-qwen-image
+- Works with: QwenImageTransformer2DModel (from backend.nn.qwen), e.g. nunchaku_qwen_image_2512_* fp4
 - Does NOT work with: Flux models (handled by supported_controlnet_flux.py)
 
 Uses Forge's bundled ComfyUI package (no external ComfyUI installation required).
@@ -171,52 +167,45 @@ class QwenImageControlNetPatcher(ControlModelPatcher):
         """
         unet = process.sd_model.forge_objects.unet
         
-        # STRICT check: Only allow NunchakuQwenImageTransformer2DModel (from backend.nn.svdq)
-        # Reject standard QwenImageTransformer2DModel (from backend.nn.qwen) and all other models
+        # Accept both Nunchaku (svdq) and standard (qwen) Qwen Image transformer
         from backend.nn.svdq import NunchakuQwenImageTransformer2DModel
+        from backend.nn.qwen import QwenImageTransformer2DModel as StdQwenImageTransformer2DModel
         from backend.nn.flux import IntegratedFluxTransformer2DModel
         from backend.nn.svdq import SVDQFluxTransformer2DModel
         
-        is_nunchaku_qwen_image = False
+        is_qwen_image = False
         diffusion_model = None
         
         if hasattr(unet, 'model') and hasattr(unet.model, 'diffusion_model'):
             diffusion_model = unet.model.diffusion_model
             
-            # Only accept NunchakuQwenImageTransformer2DModel from svdq.py
             if isinstance(diffusion_model, NunchakuQwenImageTransformer2DModel):
-                # Additional check: make sure it's the correct one (has NunchakuModelMixin)
-                if hasattr(diffusion_model, 'offload') and hasattr(diffusion_model, 'set_offload'):
-                    is_nunchaku_qwen_image = True
+                is_qwen_image = True
+            elif isinstance(diffusion_model, StdQwenImageTransformer2DModel):
+                # Standard Qwen Image (e.g. 2512 fp4 without .qweight) — same ControlNet interface
+                is_qwen_image = True
         
         # REJECT all other models - return immediately without any processing
-        if not is_nunchaku_qwen_image:
+        if not is_qwen_image:
             if diffusion_model is not None:
                 model_type = type(diffusion_model).__name__
                 module_name = type(diffusion_model).__module__
-                print(f"[QwenImageControlNet] REJECTED: This ControlNet is designed for Nunchaku Qwen Image models ONLY!")
+                print(f"[QwenImageControlNet] REJECTED: This ControlNet is for Qwen Image models ONLY!")
                 print(f"[QwenImageControlNet] Current model: {model_type} (from {module_name})")
-                print(f"[QwenImageControlNet] Expected: NunchakuQwenImageTransformer2DModel (from backend.nn.svdq)")
                 
-                # Check what type it actually is
                 if isinstance(diffusion_model, IntegratedFluxTransformer2DModel):
-                    print(f"[QwenImageControlNet] Detected: Standard Flux1 model - ControlNet will be handled by FluxControlNetPatcher")
+                    print(f"[QwenImageControlNet] Detected: Standard Flux1 - use FluxControlNetPatcher")
                 elif isinstance(diffusion_model, SVDQFluxTransformer2DModel):
-                    print(f"[QwenImageControlNet] Detected: Nunchaku Flux1 model - ControlNet will be handled by FluxControlNetPatcher")
-                elif hasattr(diffusion_model, '__class__'):
-                    from backend.nn.qwen import QwenImageTransformer2DModel as StdQwenImageTransformer2DModel
-                    if isinstance(diffusion_model, StdQwenImageTransformer2DModel):
-                        print(f"[QwenImageControlNet] Detected: Standard Qwen Image model - NOT SUPPORTED by this ControlNet")
-                    else:
-                        print(f"[QwenImageControlNet] Detected: Unknown model type")
+                    print(f"[QwenImageControlNet] Detected: Nunchaku Flux1 - use FluxControlNetPatcher")
+                else:
+                    print(f"[QwenImageControlNet] Expected: NunchakuQwenImageTransformer2DModel or QwenImageTransformer2DModel (Qwen Image)")
             else:
                 print(f"[QwenImageControlNet] REJECTED: Cannot access diffusion_model - ControlNet will not be applied")
             
-            # CRITICAL: Return immediately - do NOT process for other models
             return
         
-        # Only proceed if it's confirmed to be NunchakuQwenImageTransformer2DModel
-        print(f"[QwenImageControlNet] Processing ControlNet for Nunchaku Qwen Image")
+        # Proceed for Qwen Image (Nunchaku or standard)
+        print(f"[QwenImageControlNet] Processing ControlNet for Qwen Image")
         print(f"[QwenImageControlNet] Strength: {self.strength}, Range: {self.start_percent}-{self.end_percent}")
         
         # Get target device from UNet model (ensure ControlNet model is on the same device)
