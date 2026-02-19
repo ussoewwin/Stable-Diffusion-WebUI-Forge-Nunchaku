@@ -135,11 +135,21 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
         return dit_config
 
     if "{}txt_norm.weight".format(key_prefix) in state_dict_keys:  # Qwen Image
+        # Nunchaku: (1) explicit .qweight in block0, or (2) any transformer_blocks quantized key, or (3) 72 blocks = 2512 Nunchaku
         _qweight: bool = "{}transformer_blocks.0.attn.to_qkv.qweight".format(key_prefix) in state_dict_keys
+        if not _qweight:
+            for k in state_dict_keys:
+                if "transformer_blocks" in k and (k.endswith(".qweight") or k.endswith(".scales") or k.endswith(".qzeros")):
+                    _qweight = True
+                    break
+        num_layers = count_blocks(state_dict_keys, "{}transformer_blocks.".format(key_prefix) + "{}.")
+        if not _qweight and num_layers >= 72:
+            # 2512 Nunchaku has 72 blocks; r128 has 60. No quant keys in some fp4 exports.
+            _qweight = True
         dit_config = {"nunchaku": _qweight}
         dit_config["image_model"] = "qwen_image"
         dit_config["in_channels"] = state_dict["{}img_in.weight".format(key_prefix)].shape[1]
-        dit_config["num_layers"] = count_blocks(state_dict_keys, "{}transformer_blocks.".format(key_prefix) + "{}.")
+        dit_config["num_layers"] = num_layers
         return dit_config
 
     # Nunchaku SDXL (isolated detection)
