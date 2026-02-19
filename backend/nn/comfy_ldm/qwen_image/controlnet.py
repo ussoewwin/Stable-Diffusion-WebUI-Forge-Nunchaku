@@ -14,7 +14,8 @@ class QwenImageControlNetModel(QwenImageTransformer2DModel):
         **kwargs
     ):
         super().__init__(final_layer=False, dtype=dtype, device=device, operations=operations, **kwargs)
-        self.main_model_double = 60
+        # Match main model block count (R128=60, 2512=72, R256=other); was hardcoded 60 and broke 2512/R256.
+        self.main_model_double = len(self.transformer_blocks)
 
         # controlnet_blocks
         self.controlnet_blocks = torch.nn.ModuleList([])
