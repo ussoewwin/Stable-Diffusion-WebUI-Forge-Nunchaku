@@ -267,15 +267,16 @@ def _detect_lora_format(lora_state_dict: Dict[str, torch.Tensor]) -> Dict[str, A
     """
     keys = list(lora_state_dict.keys())
 
+    # Partial match so PEFT format (.lora_A.default.weight) is detected (v2.3.8)
     standard_patterns = (
-        ".lora_up.weight",
-        ".lora_down.weight",
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora.up.weight",
-        ".lora.down.weight",
-        ".lora.A.weight",
-        ".lora.B.weight",
+        ".lora_up.",
+        ".lora_down.",
+        ".lora_A.",
+        ".lora_B.",
+        ".lora.up.",
+        ".lora.down.",
+        ".lora.A.",
+        ".lora.B.",
     )
 
     def _sample(match_fn, limit: int = 8) -> List[str]:
@@ -917,6 +918,7 @@ def compose_loras_v2(
 
     # 2. Apply aggregated weights to the model
     applied_modules_count = 0
+    skipped_lora_names: set = set()
 
     for module_name, parts in aggregated_weights.items():
         resolved_name, module = _resolve_module_name(model, module_name)
@@ -938,6 +940,7 @@ def compose_loras_v2(
 
         # STRICT BRANCH: AWQ modulation layers — ONLY for Nunchaku Qwen Image. Skip for all other models.
         if is_awq_w4a16 and is_modulation_layer and not _is_nunchaku_qwen_image_model(model):
+            skipped_lora_names.update(part.get("source", "") for part in parts)
             continue
 
         # Supported module types:
@@ -1030,6 +1033,17 @@ def compose_loras_v2(
             logger.info(f"[APPLY] LoRA applied to: {resolved_name}")
             print(f"[APPLY] LoRA applied to: {resolved_name}")
             applied_modules_count += 1
+
+    if skipped_lora_names:
+        logger.warning(
+            "Some weights from the following LoRAs were skipped (AWQ modulation layers apply only to Nunchaku Qwen Image):"
+        )
+        print("Some weights from the following LoRAs were skipped (AWQ modulation layers apply only to Nunchaku Qwen Image):")
+        for source in sorted(skipped_lora_names):
+            if source:
+                short_name = Path(source).name if "/" in source or "\\" in source else source
+                logger.warning(f"   - {short_name}")
+                print(f"   - {short_name}")
 
     total_loras = len(lora_configs)
     # Always output the existing log message
