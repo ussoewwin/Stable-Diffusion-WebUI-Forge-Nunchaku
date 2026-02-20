@@ -498,14 +498,22 @@ def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, m
         scale_alpha = alpha.item() if alpha is not None else float(r_lora)
         scale = strength * (scale_alpha / max(1.0, float(r_lora)))
 
-        # Move A and B to same device/dtype as module.weight for calculation
-        A_gpu = A.to(dtype=module.weight.dtype, device=module.weight.device)
-        B_gpu = B.to(dtype=module.weight.dtype, device=module.weight.device)
-        
-        # Calculate B @ A: [out_features, rank] @ [rank, in_features] = [out_features, in_features]
+        # fp8e4m3+fp16lora: CUDA addmm is not implemented for Float8 -> compute LoRA in fp16
+        weight_dtype = module.weight.dtype
+        weight_device = module.weight.device
+        is_float8 = weight_dtype in (
+            getattr(torch, "float8_e4m3fn", None),
+            getattr(torch, "float8_e5m2", None),
+            getattr(torch, "float8_e4m3fn_u", None),
+            getattr(torch, "float8_e5m2_u", None),
+        ) or "float8" in str(weight_dtype).lower()
+        compute_dtype = torch.float16 if is_float8 else weight_dtype
+
+        A_gpu = A.to(dtype=compute_dtype, device=weight_device)
+        B_gpu = B.to(dtype=compute_dtype, device=weight_device)
+
+        # B @ A: [out_features, rank] @ [rank, in_features] = [out_features, in_features]
         delta = torch.mm(B_gpu, A_gpu)
-        
-        # Apply scaling
         delta *= scale
 
         # Verify shape: module.weight should be [out_features, in_features], delta should match
@@ -520,10 +528,15 @@ def _apply_lora_to_module(module: nn.Module, A: torch.Tensor, B: torch.Tensor, m
             else:
                 # Shape mismatch - skip this LoRA
                 return
-        
-        # Add delta to the original weight
+
+        # Add delta: if weight is float8, add in fp16 then cast back (fp8+fp16 LoRA mode)
         with torch.no_grad():
-            module.weight.data.add_(delta)
+            if is_float8:
+                w = module.weight.data.float()
+                w.add_(delta)
+                module.weight.data = w.to(weight_dtype)
+            else:
+                module.weight.data.add_(delta.to(weight_dtype))
 
         # Store references for reset
         if not hasattr(model, "_lora_slots"):
