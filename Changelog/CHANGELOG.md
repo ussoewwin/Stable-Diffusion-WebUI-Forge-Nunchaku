@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 1.4.3
+
+- **Float8 + fp16 LoRA: fix crash when switching model across categories**
+  - Fixed `"addmm_cuda" not implemented for 'Float8_e4m3fn'` when using "Diffusion in Low Bits" (float8-e4m3fn + fp16 LoRA) and switching to a different model category (e.g. Z-Image ↔ Flux1). LoRA B@A is now computed in fp16 and cast back to Float8 after adding to weights.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.3) for details.
+
 ## Version 1.4.2
 
 - **wd14-tagger as built-in extension**
