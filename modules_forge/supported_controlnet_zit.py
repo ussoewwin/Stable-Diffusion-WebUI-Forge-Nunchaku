@@ -2,6 +2,12 @@ import os
 import sys
 import torch
 from torch import nn
+
+# ComfyUI を sys.path に追加してから comfy/folder_paths を import する必要がある
+from modules.paths import comfyui_master_path
+if os.path.exists(comfyui_master_path) and comfyui_master_path not in sys.path:
+    sys.path.insert(0, comfyui_master_path)
+
 import folder_paths
 import comfy.utils
 import comfy.ops
@@ -10,14 +16,6 @@ import comfy.ldm.common_dit
 import comfy.latent_formats
 import comfy.ldm.lumina.controlnet
 import comfy.model_patcher
-
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-comfyui_master_path = os.path.join(project_root, "ComfyUI-master")
-comfyui_master_path = os.path.normpath(comfyui_master_path)
-
-if os.path.exists(comfyui_master_path):
-    if comfyui_master_path not in sys.path:
-        sys.path.insert(0, comfyui_master_path)
 
 from modules_forge.supported_controlnet import ControlModelPatcher
 

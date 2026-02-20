@@ -67,6 +67,11 @@ def initialize_forge():
 
     startup_timer.record("diffusers_dir")
 
+    from modules_forge import hf_hub_compat
+
+    hf_hub_compat.apply()
+    startup_timer.record("hf_hub_compat")
+
     from modules_forge import patch_basic
 
     patch_basic.patch_all_basics()

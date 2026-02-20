@@ -129,6 +129,7 @@ class FeedForward(nn.Module):
         hidden_dim: int,
         multiple_of: int,
         ffn_dim_multiplier: Optional[float],
+        dim_out: Optional[int] = None,
         operation_settings={},
     ):
         """
@@ -141,6 +142,8 @@ class FeedForward(nn.Module):
                 of this value.
             ffn_dim_multiplier (float, optional): Custom multiplier for hidden
                 dimension. Defaults to None.
+            dim_out (int, optional): Output dimension. If set, w2 maps to dim_out
+                instead of dim (for Z-Image distilled: FFN in 1920, out 3840).
 
         """
         super().__init__()
@@ -148,6 +151,7 @@ class FeedForward(nn.Module):
         if ffn_dim_multiplier is not None:
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+        out_dim = dim_out if dim_out is not None else dim
 
         self.w1 = operation_settings.get("operations").Linear(
             dim,
@@ -158,7 +162,7 @@ class FeedForward(nn.Module):
         )
         self.w2 = operation_settings.get("operations").Linear(
             hidden_dim,
-            dim,
+            out_dim,
             bias=False,
             device=operation_settings.get("device"),
             dtype=operation_settings.get("dtype"),
@@ -193,6 +197,7 @@ class JointTransformerBlock(nn.Module):
         modulation=True,
         z_image_modulation=False,
         attn_out_bias=False,
+        ffn_input_dim: Optional[int] = None,
         operation_settings={},
     ) -> None:
         """
@@ -208,17 +213,22 @@ class JointTransformerBlock(nn.Module):
             multiple_of (int):
             ffn_dim_multiplier (float):
             norm_eps (float):
+            ffn_input_dim (int, optional): If set (e.g. 1920 for Z-Image distilled),
+                FFN input is sliced from block dim to this size; FFN outputs dim.
 
         """
         super().__init__()
         self.dim = dim
+        self.ffn_input_dim = ffn_input_dim
         self.head_dim = dim // n_heads
         self.attention = JointAttention(dim, n_heads, n_kv_heads, qk_norm, out_bias=attn_out_bias, operation_settings=operation_settings)
+        ffn_in = ffn_input_dim if ffn_input_dim is not None else dim
         self.feed_forward = FeedForward(
-            dim=dim,
-            hidden_dim=dim,
+            dim=ffn_in,
+            hidden_dim=ffn_in,
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
+            dim_out=dim if ffn_input_dim is not None else None,
             operation_settings=operation_settings,
         )
         self.layer_id = layer_id
@@ -284,10 +294,11 @@ class JointTransformerBlock(nn.Module):
                     transformer_options=transformer_options,
                 ))
             )
+            ffn_in = modulate(self.ffn_norm1(x), scale_mlp)
+            if self.ffn_input_dim is not None:
+                ffn_in = ffn_in[..., :self.ffn_input_dim]
             x = x + gate_mlp.unsqueeze(1).tanh() * self.ffn_norm2(
-                clamp_fp16(self.feed_forward(
-                    modulate(self.ffn_norm1(x), scale_mlp),
-                ))
+                clamp_fp16(self.feed_forward(ffn_in))
             )
         else:
             assert adaln_input is None
@@ -299,11 +310,10 @@ class JointTransformerBlock(nn.Module):
                     transformer_options=transformer_options,
                 ))
             )
-            x = x + self.ffn_norm2(
-                self.feed_forward(
-                    self.ffn_norm1(x),
-                )
-            )
+            ffn_in = self.ffn_norm1(x)
+            if self.ffn_input_dim is not None:
+                ffn_in = ffn_in[..., :self.ffn_input_dim]
+            x = x + self.ffn_norm2(self.feed_forward(ffn_in))
         return x
 
 
@@ -379,6 +389,7 @@ class NextDiT(nn.Module):
         pad_tokens_multiple=None,
         clip_text_dim=None,
         image_model=None,
+        ffn_input_dim: Optional[int] = None,
         device=None,
         dtype=None,
         operations=None,
@@ -486,6 +497,7 @@ class NextDiT(nn.Module):
                     qk_norm,
                     z_image_modulation=z_image_modulation,
                     attn_out_bias=False,
+                    ffn_input_dim=ffn_input_dim,
                     operation_settings=operation_settings,
                 )
                 for layer_id in range(n_layers)

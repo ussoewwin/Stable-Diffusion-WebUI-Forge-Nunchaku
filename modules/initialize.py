@@ -21,6 +21,9 @@ def shush_nunchaku():
     _original = logging.basicConfig
     logging.basicConfig = lambda *args, **kwargs: None
 
+    from modules_forge import transformers_cache_compat
+    transformers_cache_compat.apply()
+
     try:
         import nunchaku
     except ImportError:

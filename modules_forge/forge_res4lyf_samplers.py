@@ -135,33 +135,23 @@ def register_res4lyf_samplers():
             server_module.PromptServer = MockPromptServer
             sys.modules['server'] = server_module
         
-        # Add ComfyUI-master directory to sys.path to access nodes and latent_preview modules
-        # In ComfyUI, custom_nodes are loaded with ComfyUI root in sys.path, so nodes and latent_preview are directly importable
-        # __file__ = modules_forge/forge_res4lyf_samplers.py
-        # dirname(dirname(__file__)) = project root (sd-webui-forge-classic-neo)
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        comfyui_master_path = os.path.join(project_root, "ComfyUI-master")
-        comfyui_master_path = os.path.normpath(comfyui_master_path)
-        
+        # Add ComfyUI directory to sys.path (path from modules.paths / COMFYUI_FOLDER_NAME)
+        from modules.paths import comfyui_master_path
         if os.path.exists(comfyui_master_path):
             if comfyui_master_path not in sys.path:
                 sys.path.insert(0, comfyui_master_path)
-                logger.info(f"[RES4LYF] Added ComfyUI-master to sys.path: {comfyui_master_path}")
-                # Verify nodes.py and latent_preview.py exist
-                nodes_py = os.path.join(comfyui_master_path, "nodes.py")
-                latent_preview_py = os.path.join(comfyui_master_path, "latent_preview.py")
-                logger.info(f"[RES4LYF] nodes.py exists: {os.path.exists(nodes_py)}, latent_preview.py exists: {os.path.exists(latent_preview_py)}")
-            else:
-                logger.info(f"[RES4LYF] ComfyUI-master already in sys.path: {comfyui_master_path}")
+                logger.info(f"[RES4LYF] Added ComfyUI to sys.path: {comfyui_master_path}")
+            nodes_py = os.path.join(comfyui_master_path, "nodes.py")
+            latent_preview_py = os.path.join(comfyui_master_path, "latent_preview.py")
+            logger.info(f"[RES4LYF] nodes.py exists: {os.path.exists(nodes_py)}, latent_preview.py exists: {os.path.exists(latent_preview_py)}")
         else:
-            logger.warning(f"[RES4LYF] ComfyUI-master not found at: {comfyui_master_path}")
-            # Try alternative path: parent directory
-            parent_dir = os.path.dirname(project_root)
-            comfyui_master_path_alt = os.path.join(parent_dir, "ComfyUI-master")
-            if os.path.exists(comfyui_master_path_alt):
-                if comfyui_master_path_alt not in sys.path:
-                    sys.path.insert(0, comfyui_master_path_alt)
-                    logger.info(f"[RES4LYF] Added ComfyUI-master to sys.path (from parent): {comfyui_master_path_alt}")
+            logger.warning(f"[RES4LYF] ComfyUI not found at: {comfyui_master_path}")
+            parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from modules.paths_internal import COMFYUI_FOLDER_NAME
+            comfyui_master_path_alt = os.path.join(parent_dir, COMFYUI_FOLDER_NAME)
+            if os.path.exists(comfyui_master_path_alt) and comfyui_master_path_alt not in sys.path:
+                sys.path.insert(0, comfyui_master_path_alt)
+                logger.info(f"[RES4LYF] Added ComfyUI to sys.path (from parent): {comfyui_master_path_alt}")
         
         # Import RES4LYF module - this will automatically call add_samplers() in __init__.py
         # Note: RES4LYF/__init__.py imports helper_sigma_preview_image_preproc and nodes_latents
