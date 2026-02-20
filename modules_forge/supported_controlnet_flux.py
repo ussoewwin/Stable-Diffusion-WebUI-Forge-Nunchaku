@@ -10,18 +10,13 @@ import os
 import sys
 import torch
 
-# Ensure ComfyUI-master is in sys.path before importing comfy
-# This ensures we use ComfyUI-master/comfy instead of the project root comfy directory
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-comfyui_master_path = os.path.join(project_root, "ComfyUI-master")
-comfyui_master_path = os.path.normpath(comfyui_master_path)
-
+# Use ComfyUI path from modules.paths (COMFYUI_FOLDER_NAME in paths_internal)
+from modules.paths import comfyui_master_path
+project_root = os.path.dirname(comfyui_master_path)
 if os.path.exists(comfyui_master_path):
     if comfyui_master_path not in sys.path:
         sys.path.insert(0, comfyui_master_path)
-    # Remove project root comfy directory from sys.path if it exists
-    project_comfy_path = os.path.join(project_root, "comfy")
-    project_comfy_path = os.path.normpath(project_comfy_path)
+    project_comfy_path = os.path.normpath(os.path.join(project_root, "comfy"))
     if project_comfy_path in sys.path:
         sys.path.remove(project_comfy_path)
 

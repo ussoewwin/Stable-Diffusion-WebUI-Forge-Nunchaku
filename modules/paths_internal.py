@@ -24,6 +24,9 @@ cmd_opts_pre, _ = parser.parse_known_args()
 
 data_path = cmd_opts_pre.data_dir
 
+# ComfyUI 本体のフォルダ名（更新時はここだけ変更すればよい）
+COMFYUI_FOLDER_NAME = "ComfyUI-master"
+
 models_path = cmd_opts_pre.model_ref or os.path.join(data_path, "models")
 extensions_dir = os.path.join(data_path, "extensions")
 extensions_builtin_dir = os.path.join(script_path, "extensions-builtin")

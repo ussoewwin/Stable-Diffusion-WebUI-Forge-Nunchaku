@@ -76,6 +76,38 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
             dit_config["time_scale"] = 1000.0
             if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
                 dit_config["pad_tokens_multiple"] = 32
+            # Z-Image distilled: main layers の FFN が 1920 次元入力 (attention は 3840 のまま)
+            ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
+            ff_w2_key = "{}layers.0.feed_forward.w2.weight".format(key_prefix)
+            if ff_w1_key in state_dict_keys and ff_w2_key in state_dict_keys:
+                ff_w1 = state_dict[ff_w1_key]
+                ff_w2 = state_dict[ff_w2_key]
+                if ff_w1.shape[1] == 1920 and ff_w2.shape[0] == 3840:
+                    dit_config["ffn_input_dim"] = 1920
+                    # ゲート出力次元 = w2.in_features に合わせる (5120)
+                    dit_config["ffn_dim_multiplier"] = float(ff_w2.shape[1]) / 1920.0
+        elif dit_config["dim"] == 1920:  # Z-Image Base (小規模)
+            dit_config["nunchaku"] = "{}layers.0.attention.to_out.0.qweight".format(key_prefix) in state_dict_keys
+            dit_config["n_heads"] = 30
+            dit_config["n_kv_heads"] = 30
+            dit_config["axes_dims"] = [16, 24, 24]  # sum = 64 = dim // n_heads
+            dit_config["axes_lens"] = [1536, 512, 512]
+            dit_config["rope_theta"] = 256.0
+            dit_config["z_image_modulation"] = True
+            dit_config["time_scale"] = 1000.0
+            if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
+                dit_config["pad_tokens_multiple"] = 32
+            # ffn_dim_multiplier は下で state_dict から推定
+
+        # Lumina2/Z-Image: state_dict の feed_forward.w1 から ffn_dim_multiplier を推定（Z Image Base 等の変種に対応）
+        ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
+        if ff_w1_key in state_dict_keys:
+            ff_w1 = state_dict[ff_w1_key]
+            # w1: (out_features=hidden_dim, in_features=dim)
+            ff_hidden = int(ff_w1.shape[0])
+            dim_actual = int(ff_w1.shape[1])
+            if dim_actual == dit_config["dim"] and ff_hidden > 0:
+                dit_config["ffn_dim_multiplier"] = ff_hidden / float(dim_actual)
 
         return dit_config
 
@@ -371,7 +403,9 @@ def top_candidate(state_dict, candidates):
 
 
 def unet_prefix_from_state_dict(state_dict):
+    # 長い prefix を先に（preprocess_state_dict で model.diffusion_model. が付与された transformer.xxx 用）
     candidates = [
+        "model.diffusion_model.transformer.",  # Forge/Lumina2/Z Image 等（transformer + model.diffusion_model 付与後）
         "model.diffusion_model.",  # ldm/sgm models
         "model.model.",  # audio models
         "net.",  # cosmos
