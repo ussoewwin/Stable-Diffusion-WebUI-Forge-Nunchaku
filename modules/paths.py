@@ -1,11 +1,9 @@
 import os
 import sys
-from modules.paths_internal import models_path, script_path, data_path, extensions_dir, extensions_builtin_dir, cwd  # noqa: F401
+from modules.paths_internal import models_path, script_path, data_path, extensions_dir, extensions_builtin_dir, cwd, COMFYUI_FOLDER_NAME  # noqa: F401
 
-# Ensure ComfyUI-master is in sys.path before script_path
-# This ensures we use ComfyUI-master/comfy instead of the project root comfy directory
-comfyui_master_path = os.path.join(script_path, "ComfyUI-master")
-comfyui_master_path = os.path.normpath(comfyui_master_path)
+# Ensure ComfyUI is in sys.path before script_path (use COMFYUI_FOLDER_NAME so updating ComfyUI is easy)
+comfyui_master_path = os.path.normpath(os.path.join(script_path, COMFYUI_FOLDER_NAME))
 
 if os.path.exists(comfyui_master_path):
     if comfyui_master_path not in sys.path:

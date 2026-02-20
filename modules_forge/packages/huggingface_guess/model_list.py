@@ -349,6 +349,29 @@ class Lumina2(BASE):
             return {"gemma2_2b": "text_encoder"}
 
 
+class ZImageBase(Lumina2):
+    """Z-Image Base（dim=1920 の小規模版）。ComfyUI-master の NextDiT と互換。"""
+
+    huggingface_repo = "Tongyi-MAI/Z-Image-Turbo"  # 同一パイプライン設定で NextDiT をロード
+
+    unet_config = {
+        "image_model": "lumina2",
+        "dim": 1920,
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 3.0,
+    }
+
+    memory_usage_factor = 1.6
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
+
+    def clip_target(self, state_dict={}):
+        return {"qwen3_4b.transformer": "text_encoder"}
+
+
 class ZImage(Lumina2):
     huggingface_repo = "Tongyi-MAI/Z-Image-Turbo"
 
@@ -414,6 +437,7 @@ models = [
     FluxSchnell,
     Chroma,
     Lumina2,
+    ZImageBase,
     ZImage,
     QwenImage,
 ]

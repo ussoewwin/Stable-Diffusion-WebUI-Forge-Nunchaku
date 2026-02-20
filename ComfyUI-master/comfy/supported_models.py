@@ -1031,6 +1031,22 @@ class Lumina2(supported_models_base.BASE):
         hunyuan_detect = comfy.text_encoders.hunyuan_video.llama_detect(state_dict, "{}gemma2_2b.transformer.".format(pref))
         return supported_models_base.ClipTarget(comfy.text_encoders.lumina2.LuminaTokenizer, comfy.text_encoders.lumina2.te(**hunyuan_detect))
 
+    def process_unet_state_dict(self, state_dict):
+        # Z-Image distilled: main layers の FFN が w1/w3 を 10240 行で保存しているが、モデルは 5120 使用
+        ffn_input_dim = self.unet_config.get("ffn_input_dim")
+        if ffn_input_dim == 1920:
+            import re
+            target_hidden = 5120  # 1920 * (8/3)
+            out = dict(state_dict)
+            for k in list(out.keys()):
+                m = re.match(r"layers\.(\d+)\.feed_forward\.(w1|w3)\.weight$", k)
+                if m and k in out:
+                    w = out[k]
+                    if w.dim() == 2 and w.shape[0] > target_hidden and w.shape[1] == 1920:
+                        out[k] = w[:target_hidden, :].clone()
+            return out
+        return state_dict
+
 class ZImage(Lumina2):
     unet_config = {
         "image_model": "lumina2",

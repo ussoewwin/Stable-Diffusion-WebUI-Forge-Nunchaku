@@ -35,6 +35,109 @@ logging.getLogger("diffusers").setLevel(logging.ERROR)
 dir_path = os.path.dirname(__file__)
 
 
+def _zimage_distilled_dequant_and_slice(state_dict, target_hidden):
+    """Z-Image distilled: main layers の FFN が comfy_quant なら復量子化し、w1/w3 を target_hidden 行にスライスする。"""
+    import json
+    out = dict(state_dict)
+    dequant_ok = 0
+    dequant_fail = 0
+    # キーが "layers.0..." か "transformer.layers.0..." かを検出
+    layer_prefix = ""
+    for k in out:
+        if "feed_forward.w1.weight" in k and "layers." in k:
+            idx = k.find("layers.")
+            if idx > 0:
+                layer_prefix = k[:idx]
+            break
+    for i in range(30):
+        for wname in ("w1", "w2", "w3"):
+            base = f"{layer_prefix}layers.{i}.feed_forward.{wname}"
+            key = f"{base}.weight"
+            if key not in out:
+                continue
+            cq_key = f"{base}.comfy_quant"
+            w = out[key]
+            if cq_key in out:
+                try:
+                    layer_conf = json.loads(out.pop(cq_key).numpy().tobytes().decode("utf-8"))
+                except Exception:
+                    continue
+                fmt = layer_conf.get("format")
+                scale_key = f"{base}.weight_scale"
+                scale2_key = f"{base}.weight_scale_2"
+                in_scale_key = f"{base}.input_scale"
+                scale = out.pop(scale_key, None)
+                scale2 = out.pop(scale2_key, None)
+                out.pop(in_scale_key, None)
+                w_fp = None
+                exc_msg = None
+                last_exc = None
+                try:
+                    import comfy.quant_ops as qops
+                    if fmt in ("float8_e4m3fn", "float8_e5m2"):
+                        layout_name = "TensorCoreFP8E5M2Layout" if fmt == "float8_e5m2" else "TensorCoreFP8E4M3Layout"
+                        layout_cls = qops.get_layout_class(layout_name)
+                        if layout_cls is not None and scale is not None:
+                            scale = scale.float().to(w.device)
+                            params = layout_cls.Params(
+                                scale=scale,
+                                orig_dtype=torch.float32,
+                                orig_shape=tuple(w.shape),
+                            )
+                            qt = qops.QuantizedTensor(w.to(w.device), layout_name, params)
+                            w_fp = qt.dequantize()
+                        elif scale is not None:
+                            scale = scale.float().to(w.device).squeeze()
+                            w_fp = w.float().to(w.device) * scale
+                        else:
+                            w_fp = w.float()
+                    elif fmt == "nvfp4":
+                        layout_cls = qops.get_layout_class("TensorCoreNVFP4Layout")
+                        if layout_cls is None:
+                            exc_msg = "comfy_kitchen not available (TensorCoreNVFP4Layout is None)"
+                        elif scale2 is None or scale is None:
+                            exc_msg = "missing weight_scale or weight_scale_2"
+                        else:
+                            params = layout_cls.Params(
+                                scale=scale2.float().to(w.device),
+                                block_scale=scale.to(w.device),
+                                orig_dtype=torch.float32,
+                                orig_shape=tuple(w.shape),
+                            )
+                            qt = qops.QuantizedTensor(w.to(w.device), "TensorCoreNVFP4Layout", params)
+                            w_fp = qt.dequantize()
+                except Exception as e:
+                    exc_msg = str(e)
+                    last_exc = e
+                if w_fp is None:
+                    if exc_msg and dequant_fail == 0:
+                        logging.warning(
+                            "[Z-Image distilled] FFN %s dequant failed (%s). Install comfy_kitchen for nvfp4.",
+                            base, exc_msg,
+                        )
+                    dequant_fail += 1
+                    if w.dtype == torch.uint8:
+                        raise RuntimeError(
+                            "[Z-Image distilled] NVFP4 dequant failed (comfy_kitchen required). "
+                            "Install: pip install comfy_kitchen"
+                        ) from last_exc
+                    if scale is not None:
+                        w_fp = w.float().to(w.device) * scale.float().to(w.device).squeeze()
+                    else:
+                        w_fp = w.float()
+                else:
+                    dequant_ok += 1
+                if wname in ("w1", "w3") and w_fp.dim() == 2 and w_fp.shape[0] > target_hidden and w_fp.shape[1] == 1920:
+                    w_fp = w_fp[:target_hidden, :].clone()
+                out[key] = w_fp
+            else:
+                if wname in ("w1", "w3") and w.dim() == 2 and w.shape[0] > target_hidden and w.shape[1] == 1920:
+                    out[key] = w[:target_hidden, :].clone()
+    if dequant_ok:
+        logging.info("[Z-Image distilled] Dequantized %d FFN layers (nvfp4/comfy_quant).", dequant_ok)
+    return out
+
+
 def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_path, state_dict):
     config_path = os.path.join(repo_path, component_name)
 
@@ -359,6 +462,10 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 # Standard ZIT: Apply LoRA support (same as Nunchaku ZIT but without Nunchaku-specific patching)
                 from backend.nn.svdq import patch_standard_zimage
                 model = patch_standard_zimage(model)
+            # Z-Image distilled: main layers の FFN を復量子化してからスライス（comfy_quant 対応）
+            if unet_config.get("ffn_input_dim") == 1920:
+                _target_hidden = 5120
+                state_dict = _zimage_distilled_dequant_and_slice(state_dict, _target_hidden)
             load_state_dict(model, state_dict)
 
             if hasattr(model, "_internal_dict"):
