@@ -56,3 +56,6 @@ trace.json
 /extensions-builtin/Config-Presets/config-txt2img-custom-tracked-components.txt
 /docs/
 modules/RES4LYF/.git
+
+# ComfyUI 用カスタムノード（Forge では未使用。参照のみ必要なら別リポジトリで管理）
+/ComfyUI-nunchaku/
