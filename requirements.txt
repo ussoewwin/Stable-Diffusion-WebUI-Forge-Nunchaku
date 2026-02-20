@@ -59,3 +59,8 @@ python-socketio
 typer-config
 loguru
 rembg
+# WD14-tagger (builtin)
+deepdanbooru
+jsonschema
+pandas
+tensorflow
