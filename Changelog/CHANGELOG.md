@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.4.2
+
+- **wd14-tagger as built-in extension**
+  - WD14 Tagger integrated into `extensions-builtin` for image captioning/tagging without a separate install.
+- **ComfyUI-Master core refresh**
+  - Bundled ComfyUI updated to track upstream; compatible with current ComfyUI-Master for node and model loading.
+
 ## Version 1.4.1
 
 - **transformers 5+ compatibility**
