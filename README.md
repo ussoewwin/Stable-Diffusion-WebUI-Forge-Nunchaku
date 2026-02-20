@@ -150,6 +150,9 @@ This project is built upon the following repositories:
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)**  
   Extension for Automatic1111 - configurable dropdown to change settings in txt2img and img2img tabs by [@Zyin055](https://github.com/Zyin055)
 
+- **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)**  
+  Labeling extension for Web UI (DeepDanbooru etc.) by [@picobyte](https://github.com/picobyte)
+
 ## License
 
 This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
@@ -165,5 +168,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Apache 2.0
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
+- **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 
 See [LICENSE](LICENSE) file for details.

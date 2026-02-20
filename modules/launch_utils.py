@@ -199,7 +199,10 @@ def list_extensions(settings_file):
     if disable_all_extensions != "none" or args.disable_extra_extensions or args.disable_all_extensions or not os.path.isdir(extensions_dir):
         return []
 
-    return [x for x in os.listdir(extensions_dir) if x not in disabled_extensions]
+    builtin_names = set()
+    if os.path.isdir(extensions_builtin_dir):
+        builtin_names = set(os.listdir(extensions_builtin_dir))
+    return [x for x in os.listdir(extensions_dir) if x not in disabled_extensions and x not in builtin_names]
 
 
 def list_extensions_builtin(settings_file):
@@ -474,10 +477,6 @@ def prepare_environment():
     if not os.path.isfile(requirements_file):
         requirements_file = os.path.join(script_path, requirements_file)
 
-    if not requirements_met(requirements_file):
-        run_pip(f'install -U -r "{requirements_file}"', "requirements")
-        startup_timer.record("install requirements")
-
     if args.onnxruntime_gpu and not is_installed("onnxruntime-gpu"):
         try:
             run_pip(f"install {onnxruntime_package}", "onnxruntime-gpu")
@@ -485,9 +484,6 @@ def prepare_environment():
             print("Failed to install onnxruntime-gpu; Please manually install it")
         else:
             startup_timer.record("install onnxruntime-gpu")
-
-    if not args.skip_install:
-        run_extensions_installers(settings_file=args.ui_settings_file)
 
     if args.update_all_extensions:
         git_pull_recursive(extensions_dir)
@@ -556,6 +552,9 @@ def configure_comfy_reference(comfy_home: Path):
 
 def start():
     print(f"Launching {'API server' if '--nowebui' in sys.argv else 'Web UI'} with arguments: {shlex.join(sys.argv[1:])}")
+    # Install import hook so first "import transformers" gets HybridCache patched (no early import)
+    from modules_forge import transformers_cache_compat
+    transformers_cache_compat.apply()
     import webui
 
     if "--nowebui" in sys.argv:
