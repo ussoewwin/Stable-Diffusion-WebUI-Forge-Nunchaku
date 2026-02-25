@@ -296,10 +296,16 @@ class KModel(torch.nn.Module):
                 # Fallback: try without num_tokens (for models that don't require it)
                 model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
         else:
-            # Other models (SD1.5, SDXL, Flux1, Qwen Image): Normal forward without ZIT-specific parameters
-            # DO NOT add transformer_options to kwargs, DO NOT pass num_tokens or attention_mask
-            model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
-        
+            # Nunchaku Qwen Image ONLY: forward uses patches["double_block"] (Fun ControlNet), so pass transformer_options.
+            # Other models (SD1.5, SDXL, Flux1, ComfyUI Qwen Image): do NOT pass transformer_options (no side effects).
+            # Use __name__ so any NunchakuQwenImageTransformer2DModel (e.g. from svdq or nunchaku_sdxl_unet) is recognized.
+            dm_type_name = type(self.diffusion_model).__name__
+            is_nunchaku_qwen_image = dm_type_name == "NunchakuQwenImageTransformer2DModel"
+            if is_nunchaku_qwen_image:
+                model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds_clean).float()
+            else:
+                model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
+
         return self.predictor.calculate_denoised(sigma, model_output, x)
 
     def memory_required(self, input_shape: list[int]) -> float:

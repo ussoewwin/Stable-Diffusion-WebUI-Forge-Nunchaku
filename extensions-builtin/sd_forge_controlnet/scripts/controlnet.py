@@ -76,7 +76,13 @@ class ControlNetForForgeOfficial(scripts.Script):
                         with gr.Tab(label=f"ControlNet Unit {i + 1}", id=i):
                             group = ControlNetUiGroup(is_img2img, default_unit)
                             ui_groups.append(group)
-                            controls.append(group.render(f"ControlNet-{i}", elem_id_tabname))
+                            out = group.render(f"ControlNet-{i}", elem_id_tabname)
+                            # out is (unit State, unit_args list); flatten so form gets State + current UI values
+                            if isinstance(out, (list, tuple)) and len(out) == 2:
+                                controls.append(out[0])
+                                controls.extend(out[1])
+                            else:
+                                controls.append(out)
 
         for i, ui_group in enumerate(ui_groups):
             infotext.register_unit(i, ui_group)
@@ -88,10 +94,32 @@ class ControlNetForForgeOfficial(scripts.Script):
         return tuple(controls)
 
     def get_enabled_units(self, units):
-        # Parse dict from API calls.
-        units = [ControlNetUnit.from_dict(unit) if isinstance(unit, dict) else unit for unit in units]
+        # Parse dict from API calls. units may be tuple of gr.State values (one per ControlNet unit).
+        # Or tuple of 60: (unit0, unit0_args_19, unit1, unit1_args_19, unit2, unit2_args_19); enabled is 6th in args (index 5).
+        if not units:
+            logger.info("ControlNet: get_enabled_units received no units (args empty or not passed)")
+            return []
+        ARGS_PER_UNIT = 20
+        ENABLED_INDEX_IN_ARGS = 5
+        if len(units) >= 3 * ARGS_PER_UNIT:
+            parsed = []
+            for i in range(3):
+                state = units[i * ARGS_PER_UNIT]
+                args_start = i * ARGS_PER_UNIT + 1
+                args_enabled = args_start + ENABLED_INDEX_IN_ARGS <= len(units) and units[args_start + ENABLED_INDEX_IN_ARGS]
+                u = ControlNetUnit.from_dict(state) if isinstance(state, dict) else state
+                if not isinstance(u, ControlNetUnit):
+                    u = ControlNetUnit(enabled=False, module="None", model="None")
+                if not u.enabled and args_enabled:
+                    u = ControlNetUnit(use_preview_as_input=u.use_preview_as_input, generated_image=u.generated_image, mask_image=u.mask_image, mask_image_fg=u.mask_image_fg, hr_option=u.hr_option, enabled=True, module=u.module, model=u.model, weight=u.weight, image=u.image, image_fg=u.image_fg, resize_mode=u.resize_mode, processor_res=u.processor_res, threshold_a=u.threshold_a, threshold_b=u.threshold_b, guidance_start=u.guidance_start, guidance_end=u.guidance_end, pixel_perfect=u.pixel_perfect, control_mode=u.control_mode, save_detected_map=u.save_detected_map, _idx=u._idx)
+                parsed.append(u)
+            units = parsed
+        else:
+            units = [ControlNetUnit.from_dict(unit) if isinstance(unit, dict) else unit for unit in units]
         assert all(isinstance(unit, ControlNetUnit) for unit in units)
         enabled_units = [x for x in units if x.enabled]
+        if not enabled_units:
+            logger.info("ControlNet: no units enabled (enable checkbox and select model in ControlNet accordion)")
         return enabled_units
 
     @staticmethod
@@ -494,6 +522,7 @@ class ControlNetForForgeOfficial(scripts.Script):
     def process(self, p, *args, **kwargs):
         self.current_params = {}
         enabled_units = self.get_enabled_units(args)
+        logger.info("ControlNet: process() called, %d enabled unit(s)", len(enabled_units))
         Infotext.write_infotext(enabled_units, p)
         for i, unit in enumerate(enabled_units):
             unit._idx = i
