@@ -63,6 +63,9 @@ modules/RES4LYF/.git
 
 /Florence-2-large-PromptGen-v2.0/
 /comfyui-florence2/
+/check_florence2_api.py
+/dump_florence2_source.py
+/verify_florence2_execution.py
 
 # ローカル用スクリプト（リリース／push 等）
 /do_*.ps1
