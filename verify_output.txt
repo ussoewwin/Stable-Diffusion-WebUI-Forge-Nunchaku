@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\verify_florence2_execution.py", line 39, in <module>
+    from nodes import load_model, Florence2Run
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\comfyui-florence2\nodes.py", line 135, in <module>
+    from transformers import AutoProcessor, set_seed
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\transformers\utils\import_utils.py", line 2044, in __getattr__
+    module = self._get_module(self._class_to_module[name])
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\transformers\utils\import_utils.py", line 2238, in _get_module
+    raise e
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\transformers\utils\import_utils.py", line 2236, in _get_module
+    return importlib.import_module("." + module_name, self.__name__)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ussoe\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\transformers\trainer_utils.py", line 65, in <module>
+    from peft import PeftMixedModel, PeftModel
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\peft\__init__.py", line 17, in <module>
+    from .auto import (
+    ...<8 lines>...
+    )
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\peft\auto.py", line 32, in <module>
+    from .peft_model import (
+    ...<7 lines>...
+    )
+  File "D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\peft\peft_model.py", line 37, in <module>
+    from transformers import Cache, DynamicCache, EncoderDecoderCache, HybridCache, PreTrainedModel
+ImportError: cannot import name 'HybridCache' from 'transformers' (D:\USERFILES\GitHub\sd-webui-forge-classic-neo\venv\Lib\site-packages\transformers\__init__.py)

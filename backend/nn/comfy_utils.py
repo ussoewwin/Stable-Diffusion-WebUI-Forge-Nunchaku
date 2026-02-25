@@ -20,7 +20,6 @@
 import torch
 import math
 import struct
-import comfy.checkpoint_pickle
 import safetensors.torch
 import numpy as np
 from PIL import Image
@@ -83,11 +82,8 @@ def load_torch_file(ckpt, safe_load=False, device=None, return_metadata=False):
         if MMAP_TORCH_FILES:
             torch_args["mmap"] = True
 
-        if safe_load or ALWAYS_SAFE_LOAD:
-            pl_sd = torch.load(ckpt, map_location=device, weights_only=True, **torch_args)
-        else:
-            logging.warning("WARNING: loading {} unsafely, upgrade your pytorch to 2.4 or newer to load this file safely.".format(ckpt))
-            pl_sd = torch.load(ckpt, map_location=device, pickle_module=comfy.checkpoint_pickle)
+        # ComfyUI removed checkpoint_pickle; always use weights_only=True for safety
+        pl_sd = torch.load(ckpt, map_location=device, weights_only=True, **torch_args)
         if "state_dict" in pl_sd:
             sd = pl_sd["state_dict"]
         else:

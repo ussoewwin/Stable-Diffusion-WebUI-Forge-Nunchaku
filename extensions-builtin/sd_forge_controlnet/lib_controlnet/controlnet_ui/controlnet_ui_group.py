@@ -499,7 +499,8 @@ class ControlNetUiGroup:
         )
         self.register_core_callbacks()
         self.ui_initialized = True
-        return unit
+        # Return (unit State, unit_args list) so form submission includes current UI values; script can use args to fix enabled when State is stale
+        return (unit, list(unit_args))
 
     def register_send_dimensions(self):
         """Register event handler for send dimension button."""

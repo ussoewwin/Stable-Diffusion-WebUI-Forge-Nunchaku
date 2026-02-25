@@ -888,6 +888,23 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
                         if t > 0:
                             hidden_states[:, :t].add_(add[:, :t], alpha=_scale)
 
+                # patches["double_block"]: same as ComfyUI qwen_image/model.py (Fun ControlNet etc.)
+                # set_model_patch(patch, "double_block") registers here; pass block_index, vec, pe so patch can run
+                patches = transformer_options.get("patches", {})
+                if "double_block" in patches:
+                    for p in patches["double_block"]:
+                        out = p({
+                            "img": hidden_states,
+                            "txt": encoder_hidden_states,
+                            "vec": temb,
+                            "pe": image_rotary_emb,
+                            "x": x,
+                            "block_index": i,
+                            "transformer_options": transformer_options,
+                        })
+                        hidden_states = out["img"]
+                        encoder_hidden_states = out["txt"]
+
             if self.offload:
                 self.offload_manager.step(compute_stream)
 

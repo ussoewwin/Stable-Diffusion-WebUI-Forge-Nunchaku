@@ -87,10 +87,14 @@ class ControlNetPatcher(ControlModelPatcher):
     def try_build_from_state_dict(controlnet_data, ckpt_path):
         # Nunchaku Qwen Image ControlNet ONLY (detected by transformer_blocks.0.img_mlp.net.0.proj.weight)
         # This is for NunchakuQwenImageTransformer2DModel ONLY - NOT for standard QwenImageTransformer2DModel
-        if "transformer_blocks.0.img_mlp.net.0.proj.weight" in controlnet_data:
+        _ix_marker = "transformer_blocks.0.img_mlp.net.0.proj.weight"
+        _ix_keys = [k for k in controlnet_data.keys() if _ix_marker in str(k)]
+        if _ix_keys:
             try:
                 from modules_forge.supported_controlnet_qwen_image import QwenImageControlNetPatcher
-                result = QwenImageControlNetPatcher.try_build_from_state_dict(controlnet_data, ckpt_path)
+                _pfx = str(_ix_keys[0]).split(_ix_marker)[0]
+                _data = {str(k)[len(_pfx):] if str(k).startswith(_pfx) else str(k): v for k, v in controlnet_data.items()} if _pfx else controlnet_data
+                result = QwenImageControlNetPatcher.try_build_from_state_dict(_data, ckpt_path)
                 if result is not None:
                     print(f"[ControlNet] Loaded Nunchaku Qwen Image ControlNet patcher (for NunchakuQwenImageTransformer2DModel ONLY)")
                 return result
@@ -111,6 +115,19 @@ class ControlNetPatcher(ControlModelPatcher):
                 print(f"Failed to load ZIT ControlNet: {e}")
                 return None
         
+        # Qwen Image Fun ControlNet (control_img_in + control_blocks; same folder as InstantX)
+        # Keys may have a prefix (e.g. "controlnet."), so match by substring
+        if any("control_img_in.weight" in str(k) for k in controlnet_data.keys()):
+            try:
+                from modules_forge.supported_controlnet_qwen_fun import QwenFunControlNetPatcher
+                result = QwenFunControlNetPatcher.try_build_from_state_dict(controlnet_data, ckpt_path)
+                if result is not None:
+                    print(f"[ControlNet] Loaded Qwen Image Fun ControlNet patcher (double_block patch)")
+                return result
+            except Exception as e:
+                print(f"[Qwen Fun ControlNet] Error loading Qwen Image Fun ControlNet: {e}")
+                return None
+
         # Flux ControlNet (InstantX format)
         if "controlnet_x_embedder.weight" in controlnet_data:
             try:

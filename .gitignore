@@ -59,3 +59,4 @@ modules/RES4LYF/.git
 
 # ComfyUI 用カスタムノード（Forge では未使用。参照のみ必要なら別リポジトリで管理）
 /ComfyUI-nunchaku/
+/ComfyUI-QwenImageLoraLoader/
