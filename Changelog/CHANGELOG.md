@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.4.4
+
+- **ComfyUI-Master update compatibility**
+  - Aligned Forge with latest ComfyUI core: removed dependency on deleted `comfy.checkpoint_pickle`; checkpoint loading now uses `torch.load(..., weights_only=True)` only (same as upstream).
+  - Added stub package `comfy_aimdo` so ComfyUI code that imports the optional PyPI package `comfy_aimdo` (AIMDO) runs without it; Forge keeps using its own memory/loader.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.4) for details.
+
 ## Version 1.4.3
 
 - **Float8 + fp16 LoRA: fix crash when switching model across categories**
