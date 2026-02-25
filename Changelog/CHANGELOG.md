@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.4.5
+
+- **Qwen-Image-2512-Fun-Controlnet-Union support**
+  - Native support for Qwen Image Fun ControlNet (e.g. Qwen-Image-2512-Fun-Controlnet, Union variants). Uses ComfyUI's `QwenImageFunControlNetModel`; injects control via per-step wrapper into `c["control"]` for Nunchaku and standard Qwen Image backends.
+  - Control image is encoded with Forge VAE and passed as raw latent; strength is applied before injection. Implementation guide in `docs/qwen_fun_controlnet_implementation_guide.md`.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.5) for details.
+
 ## Version 1.4.4
 
 - **ComfyUI-Master update compatibility**
