@@ -69,3 +69,19 @@ modules/RES4LYF/.git
 
 # ローカル用スクリプト（リリース／push 等）
 /do_*.ps1
+
+# 直下：一時的・テスト用・動作に不要
+/_nodes_diff.patch
+/_pos_embed_shapes.txt
+/convert_qwen_encoder.py
+/download_configs.py
+/inspect_processor_class.py
+/inspect_processor_source.py
+/inspect_zib_model.py
+/output_check_config.txt
+/output_source.txt
+/parse_fun_cn_header.py
+/parse_fun_cn_header_result.txt
+/test_cv2_bootstrap_patch.py
+/verify_output.txt
+/verify_output_standalone.txt
