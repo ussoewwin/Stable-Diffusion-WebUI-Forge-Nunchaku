@@ -6,6 +6,7 @@ __pycache__
 .vscode
 /.coverage*
 /.idea
+/.mailmap
 /ESRGAN/*
 /GFPGAN/*
 /SwinIR
