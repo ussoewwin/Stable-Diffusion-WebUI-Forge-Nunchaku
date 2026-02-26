@@ -29,11 +29,16 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - ✅ **Union ControlNet support for Flux1 and Nunchaku Flux1 models**
   - ✅ **Union ControlNet support for Nunchaku Qwen Image (QI) models**
   - Multiple ControlNet models can be used simultaneously (Union ControlNet)
-  - Supports Flux Union ControlNet models (e.g., `flux_shakker_labs_union_pro-2-fp8.safetensors`)
-  - Supports Qwen Image Union ControlNet models (e.g., `Qwen-Image-InstantX-ControlNet-Union.safetensors`)
+  - Supports Flux Union ControlNet models:
+    - `flux_shakker_labs_union_pro-2-fp8.safetensors`
+  - Supports Qwen Image Union ControlNet models:
+    - `Qwen-Image-InstantX-ControlNet-Union.safetensors` (InstantX)
+    - `Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors` (Fun)
   - Automatic model detection and loading:
     - Flux models: via `controlnet_x_embedder.weight` key detection
-    - Qwen Image models: via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection
+    - Qwen Image models:
+      - InstantX: via `transformer_blocks.0.img_mlp.net.0.proj.weight` key detection
+      - Fun: via `control_img_in.weight` key detection
   - VAE wrapper for seamless Forge VAE integration with ComfyUI ControlNet interface
   - Strict model type checking to ensure compatibility with correct model types
   - Complete and independent implementation for each model type
@@ -100,6 +105,7 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 **✅ Standard LoRA (Rank-Decomposed):**
 
 Supported weight keys:
+
 - `lora_up.weight` / `lora_down.weight`
 - `lora.up.weight` / `lora.down.weight`
 - `lora_A.weight` / `lora_B.weight`
