@@ -99,7 +99,7 @@ def _torch_version() -> tuple[str, str]:
 
     if m is None:
         print("\n\nFailed to parse PyTorch version...")
-        ver = os.environ.get("PYTORCH_VERSION", "2.9.1+cu128")
+        ver = os.environ.get("PYTORCH_VERSION", "2.11.0+cu130")
         print("Assuming: ", ver)
         print('(you can change this with `export PYTORCH_VERSION="..."`)\n\n')
         m = re.search(r"(\d+\.\d+\.\d+)(?:[^+]+)?\+(.+)", ver)
@@ -310,7 +310,7 @@ def requirements_met(requirements_file):
 
 def prepare_environment():
     torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu130")
-    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.9.1+cu130 torchvision==0.24.1+cu130 --extra-index-url {torch_index_url}")
+    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.11.0+cu130 torchvision==0.26.0+cu130 --extra-index-url {torch_index_url}")
     xformers_package = os.environ.get("XFORMERS_PACKAGE", f"xformers==0.0.33.post2 --extra-index-url {torch_index_url}")
     bnb_package = os.environ.get("BNB_PACKAGE", "bitsandbytes==0.48.2")
 
@@ -373,8 +373,14 @@ def prepare_environment():
     if os.name == "nt":
         ver_TRITON += ".post22"
 
-        sage_package = os.environ.get("SAGE_PACKAGE", f"https://github.com/woct0rdho/SageAttention/releases/download/v{ver_SAGE}-windows.post4/sageattention-{ver_SAGE}+{ver_CUDA}torch2.9.0andhigher.post4-cp39-abi3-win_amd64.whl")
-        flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.4.19/flash_attn-{ver_FLASH}+{ver_CUDA}torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl")
+        sage_package = os.environ.get(
+            "SAGE_PACKAGE",
+            "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattention-2.2.0%2Bcu130torch2.11.0-cp313-cp313-win_amd64.whl",
+        )
+        flash_package = os.environ.get(
+            "FLASH_PACKAGE",
+            "https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.3%2Bcu130torch2.11.0cxx11abiTRUE-cp313-cp313-win_amd64.whl",
+        )
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton-windows=={ver_TRITON}")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl")
         onnxruntime_package = os.environ.get("ONNX_PACKAGE", "https://huggingface.co/ussoewwin/onnxruntime-gpu-1.24.0/resolve/main/onnxruntime_gpu-1.24.0-cp313-cp313-win_amd64.whl")
@@ -385,6 +391,31 @@ def prepare_environment():
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
         onnxruntime_package = os.environ.get("ONNX_PACKAGE", "onnxruntime-gpu --pre --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/")
+
+    def _verify_native_import(package: str) -> bool:
+        """Verify a package can actually be imported (catches DLL / native extension failures)."""
+        if not is_installed(package):
+            return False
+        return check_run_python(f"import {package}")
+
+    def _force_uninstall(package: str) -> None:
+        """Uninstall a package, force-removing residual files if pip fails (e.g. locked .pyd on Windows)."""
+        import shutil
+        site_packages = os.path.join(venv_dir, "Lib", "site-packages")
+        try:
+            run(f'"{python}" -m pip uninstall -y {package}', f"Uninstalling broken {package}")
+        except RuntimeError:
+            print(f"pip uninstall failed for {package}; attempting manual removal")
+        for entry in os.listdir(site_packages):
+            if entry.startswith(package) or entry.startswith(package.replace("-", "_")):
+                path = os.path.join(site_packages, entry)
+                try:
+                    if os.path.isdir(path):
+                        shutil.rmtree(path)
+                    else:
+                        os.remove(path)
+                except OSError as e:
+                    print(f"Cannot remove {path}: {e} — close other Python processes and retry")
 
     def _verify_nunchaku() -> bool:
         if not is_installed("nunchaku"):
@@ -416,17 +447,19 @@ def prepare_environment():
                 print("Failed to install triton; Please manually install it")
             else:
                 startup_timer.record("install triton")
-        if not is_installed("sageattention"):
+        if not _verify_native_import("sageattention"):
+            _force_uninstall("sageattention")
             try:
-                run_pip(f"install -U -I --no-deps {sage_package}", "sageattention")
+                run_pip(f"install --no-deps {sage_package}", "sageattention")
             except RuntimeError:
                 print("Failed to install sageattention; Please manually install it")
             else:
                 startup_timer.record("install sageattention")
 
-    if args.flash and not is_installed("flash_attn"):
+    if args.flash and not _verify_native_import("flash_attn"):
+        _force_uninstall("flash_attn")
         try:
-            run_pip(f"install {flash_package}", "flash_attn")
+            run_pip(f"install --no-deps {flash_package}", "flash_attn")
         except RuntimeError:
             print("Failed to install flash_attn; Please manually install it")
         else:
