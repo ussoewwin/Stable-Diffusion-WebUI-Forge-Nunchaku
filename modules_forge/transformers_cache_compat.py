@@ -1,14 +1,14 @@
 """
-transformers 5+ / diffusers 互換パッチ
+Compatibility shims for transformers 5+ and diffusers.
 
-__import__ フックで遅延適用:
-  1. HybridCache  → DynamicCache エイリアス (peft 0.17.x 向け)
-  2. modeling_utils.no_init_weights → 自前シム (backend/loader.py 等で使用)
-  3. diffusers _flash_attn_available を実 import で検証
-     (find_spec だけでは C 拡張の DLL 不整合を検出できない)
+Applied lazily via __import__ hook:
+  1. HybridCache -> DynamicCache alias (for peft 0.17.x)
+  2. modeling_utils.no_init_weights -> local shim (backend/loader.py, etc.)
+  3. Re-validate diffusers _flash_attn_available with a real import
+     (find_spec alone cannot detect broken C extensions / DLL mismatch)
 
-重要: apply() は transformers / diffusers を一切インポートしない。
-全パッチは __import__ フック内で遅延適用される。
+Important: apply() must not import transformers or diffusers at module load time.
+All patches run inside the import hook.
 """
 import builtins
 from contextlib import contextmanager
@@ -20,8 +20,8 @@ _diffusers_import_utils_patched = False
 
 @contextmanager
 def _no_init_weights():
-    """transformers 4.x の modeling_utils.no_init_weights() 互換シム。
-    コンテキスト内で torch.nn.init 系の関数を無効にし、重み初期化をスキップする。"""
+    """Shim compatible with transformers 4.x modeling_utils.no_init_weights().
+    Disables torch.nn.init ops inside the context so weight init is skipped."""
     import torch
 
     _skip = {
@@ -54,7 +54,7 @@ def _no_init_weights():
 
 
 def _patch_no_init_weights(mod):
-    """modeling_utils モジュールに no_init_weights が無ければ注入する。"""
+    """Inject no_init_weights into modeling_utils if missing."""
     global _no_init_weights_patched
     if _no_init_weights_patched:
         return
@@ -64,16 +64,15 @@ def _patch_no_init_weights(mod):
 
 
 def _patch_diffusers_flash_attn_flag(mod):
-    """diffusers の _flash_attn_available を実 import で再検証する。
+    """Re-validate diffusers _flash_attn_available with a real import.
 
-    diffusers は importlib.util.find_spec() でパッケージの有無を判定するが、
-    これでは C 拡張 (flash_attn_2_cuda) の DLL/シンボル不整合を検出できない。
-    torch バージョン更新後に旧ビルドの .pyd が残っていると、
-    find_spec=True なのに実 import で ImportError が発生し起動クラッシュする。
+    diffusers uses importlib.util.find_spec() for optional packages; that does not
+    detect DLL/symbol mismatch in flash_attn_2_cuda. After a torch upgrade an old
+    .pyd may remain: find_spec is True but import fails and startup crashes.
 
-    このパッチは diffusers.utils.import_utils 読み込み直後に一度だけ走り、
-    _flash_attn_available が True なら実際に import して検証する。
-    失敗した場合のみフラグを False に修正する。
+    This runs once right after diffusers.utils.import_utils loads. If
+    _flash_attn_available is True, try import flash_attn; on failure set the flag
+    to False.
     """
     global _diffusers_import_utils_patched
     if _diffusers_import_utils_patched:
@@ -95,14 +94,14 @@ def _patch_diffusers_flash_attn_flag(mod):
 def _hooked_import(name, *args, **kwargs):
     mod = _original_import(name, *args, **kwargs)
 
-    # --- HybridCache パッチ ---
+    # HybridCache patch
     if name == "transformers":
         fromlist = args[2] if len(args) > 2 else kwargs.get("fromlist", ())
         if fromlist and "HybridCache" in fromlist and not hasattr(mod, "HybridCache"):
             from transformers.cache_utils import DynamicCache
             mod.__dict__["HybridCache"] = DynamicCache
 
-    # --- no_init_weights パッチ ---
+    # no_init_weights patch
     if name == "transformers.modeling_utils":
         _patch_no_init_weights(mod)
     elif name == "transformers":
@@ -113,7 +112,7 @@ def _hooked_import(name, *args, **kwargs):
             if mu is not None:
                 _patch_no_init_weights(mu)
 
-    # --- diffusers flash_attn 可用性パッチ ---
+    # diffusers flash_attn availability patch
     if name == "diffusers.utils.import_utils":
         _patch_diffusers_flash_attn_flag(mod)
 
@@ -121,11 +120,11 @@ def _hooked_import(name, *args, **kwargs):
 
 
 def apply():
-    """nunchaku / peft / diffusers のインポート前に呼ぶこと。transformers は一切インポートしない。"""
+    """Call before importing nunchaku / peft / diffusers; does not import transformers."""
     global _original_import
 
     if _original_import is not None:
-        return  # 二重適用防止
+        return  # idempotent
 
     _original_import = builtins.__import__
     builtins.__import__ = _hooked_import
