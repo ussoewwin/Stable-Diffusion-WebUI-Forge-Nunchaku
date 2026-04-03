@@ -3,6 +3,7 @@ __pycache__
 *.pth
 *.safetensors
 .DS_Store
+.cursor/
 .vscode
 /.coverage*
 /.idea
