@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 1.4.7
+
+- **Fresh install and setup bug fixes for Python 3.13, ADetailer initialization, and triton-windows environment setup.** See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.7) for details.
+
 ## Version 1.4.6
 
 - **PyTorch 2.11.0+cu130 defaults, Windows FA2/SA2 wheel URLs, and fixes for `flash_attn` / diffusers startup after torch upgrades.** See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.6) for details.
