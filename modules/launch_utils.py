@@ -401,7 +401,8 @@ def prepare_environment():
     def _force_uninstall(package: str) -> None:
         """Uninstall a package, force-removing residual files if pip fails (e.g. locked .pyd on Windows)."""
         import shutil
-        site_packages = os.path.join(venv_dir, "Lib", "site-packages")
+        import sysconfig
+        site_packages = sysconfig.get_paths()["purelib"]
         try:
             run(f'"{python}" -m pip uninstall -y {package}', f"Uninstalling broken {package}")
         except RuntimeError:
