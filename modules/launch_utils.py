@@ -371,8 +371,6 @@ def prepare_environment():
     v_TORCH = ver_TORCH.rsplit(".", 1)[0]
 
     if os.name == "nt":
-        ver_TRITON += ".post22"
-
         sage_package = os.environ.get(
             "SAGE_PACKAGE",
             "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattention-2.2.0%2Bcu130torch2.11.0-cp313-cp313-win_amd64.whl",
@@ -381,7 +379,7 @@ def prepare_environment():
             "FLASH_PACKAGE",
             "https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.3%2Bcu130torch2.11.0cxx11abiTRUE-cp313-cp313-win_amd64.whl",
         )
-        triton_package = os.environ.get("TRITION_PACKAGE", f"triton-windows=={ver_TRITON}")
+        triton_package = os.environ.get("TRITION_PACKAGE", "triton-windows")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl")
         onnxruntime_package = os.environ.get("ONNX_PACKAGE", "https://huggingface.co/ussoewwin/onnxruntime-gpu-1.24.0/resolve/main/onnxruntime_gpu-1.24.0-cp313-cp313-win_amd64.whl")
 
