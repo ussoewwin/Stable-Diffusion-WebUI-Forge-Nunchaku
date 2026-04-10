@@ -227,31 +227,27 @@ def list_extensions_builtin(settings_file):
 
 
 def run_extensions_installers(settings_file):
-    if not os.path.isdir(extensions_dir):
-        return
+    if os.path.isdir(extensions_dir):
+        with startup_timer.subcategory("run extensions installers"):
+            for dirname_extension in list_extensions(settings_file):
+                logging.debug(f"Installing {dirname_extension}")
 
-    with startup_timer.subcategory("run extensions installers"):
-        for dirname_extension in list_extensions(settings_file):
-            logging.debug(f"Installing {dirname_extension}")
+                path = os.path.join(extensions_dir, dirname_extension)
 
-            path = os.path.join(extensions_dir, dirname_extension)
+                if os.path.isdir(path):
+                    run_extension_installer(path)
+                    startup_timer.record(dirname_extension)
 
-            if os.path.isdir(path):
-                run_extension_installer(path)
-                startup_timer.record(dirname_extension)
+    if os.path.isdir(extensions_builtin_dir):
+        with startup_timer.subcategory("run extensions_builtin installers"):
+            for dirname_extension in list_extensions_builtin(settings_file):
+                logging.debug(f"Installing {dirname_extension}")
 
-    if not os.path.isdir(extensions_builtin_dir):
-        return
+                path = os.path.join(extensions_builtin_dir, dirname_extension)
 
-    with startup_timer.subcategory("run extensions_builtin installers"):
-        for dirname_extension in list_extensions_builtin(settings_file):
-            logging.debug(f"Installing {dirname_extension}")
-
-            path = os.path.join(extensions_builtin_dir, dirname_extension)
-
-            if os.path.isdir(path):
-                run_extension_installer(path)
-                startup_timer.record(dirname_extension)
+                if os.path.isdir(path):
+                    run_extension_installer(path)
+                    startup_timer.record(dirname_extension)
 
     return
 
