@@ -526,6 +526,8 @@ def prepare_environment():
         git_pull_recursive(extensions_dir)
         startup_timer.record("update extensions")
 
+    run_extensions_installers(settings_file=args.ui_settings_file)
+
     if not requirements_met(requirements_file):
         run_pip(f'install -U -r "{requirements_file}"', "requirements")
         startup_timer.record("enforce requirements")
