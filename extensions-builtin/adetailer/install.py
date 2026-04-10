@@ -153,6 +153,18 @@ def download_yolov11_models():
 
 def download_insightface():
     """Download InsightFace wheel for Python 3.13 compatibility"""
+    
+    # Check if InsightFace is already installed
+    if is_installed("insightface"):
+        print("[-] ADetailer: InsightFace already installed")
+        return
+
+    # On non-Windows platforms (Linux/macOS), rely on standard PyPI installation
+    if sys.platform != "win32":
+        print(f"[-] ADetailer: Installing InsightFace via standard pip for {sys.platform}...")
+        run_pip("insightface")
+        return
+
     try:
         import requests
     except ImportError:
@@ -173,11 +185,6 @@ def download_insightface():
         wheel_file = "insightface-0.7.3-cp311-cp311-win_amd64.whl"
     else:
         print(f"[-] ADetailer: Python {python_version} not supported for InsightFace wheel")
-        return
-    
-    # Check if InsightFace is already installed
-    if is_installed("insightface"):
-        print("[-] ADetailer: InsightFace already installed")
         return
     
     print(f"[-] ADetailer: Downloading InsightFace wheel for Python {python_version}...")
