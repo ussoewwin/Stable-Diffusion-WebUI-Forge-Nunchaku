@@ -432,7 +432,10 @@ def prepare_environment():
         return current >= target
 
     if not is_installed("clip"):
-        run_pip(f"install {clip_package}", "clip")
+        # Ensure setuptools (pkg_resources) is available for CLIP's setup.py on Python 3.13+
+        if not is_installed("setuptools"):
+            run_pip("install setuptools<82", "setuptools (for clip)")
+        run_pip(f"install --no-build-isolation {clip_package}", "clip")
         startup_timer.record("install clip")
 
     if args.xformers and (not is_installed("xformers") or args.reinstall_xformers):
