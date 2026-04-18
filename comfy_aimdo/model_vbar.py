@@ -30,3 +30,16 @@ class ModelVBAR:
 
     def loaded_size(self):
         return 0
+
+    def prioritize(self):
+        return None
+
+    def alloc(self, size):
+        return bytearray(max(0, int(size)))
+
+    def free_memory(self, target):
+        return 0
+
+
+def vbars_analyze():
+    return 0
