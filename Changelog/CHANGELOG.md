@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 1.4.8
+
+- **ComfyUI-master 0.19.3 sync and AIMDO import compatibility**
+  - Updated the bundled `ComfyUI-master` tree to match ComfyUI 0.19.3; upstream now imports optional AIMDO modules (`comfy_aimdo.*`) during startup.
+  - Extended the repository `comfy_aimdo` stub package (root and `ComfyUI-master/comfy_aimdo/`) with `host_buffer`, `model_mmap`, and related APIs so Forge starts without the real AIMDO wheel; Forge continues to use its own loader and memory paths.
+  - Added `docs/comfyui_master_0_19_3_error_analysis.md` (English): root cause, full traceback, import-flow sequence diagrams, and file-level notes.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.8) for details.
+
 ## Version 1.4.7
 
 - **Fresh install and setup bug fixes for Python 3.13, ADetailer initialization, and triton-windows environment setup.** See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.7) for details.
