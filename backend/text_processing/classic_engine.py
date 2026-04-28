@@ -77,7 +77,7 @@ class ClassicTextProcessingEngine:
         self.id_end = self.tokenizer.eos_token_id
         self.id_pad = self.tokenizer.pad_token_id
 
-        model_embeddings = text_encoder.transformer.text_model.embeddings
+        model_embeddings = text_encoder.transformer.embeddings
         model_embeddings.token_embedding = CLIPEmbeddingForTextualInversion(model_embeddings.token_embedding, self.embeddings, textual_inversion_key=embedding_key)
 
         vocab = self.tokenizer.get_vocab()
@@ -100,9 +100,9 @@ class ClassicTextProcessingEngine:
     def encode_with_transformers(self, tokens):
         target_device = memory_management.text_encoder_device()
 
-        self.text_encoder.transformer.text_model.embeddings.position_ids = self.text_encoder.transformer.text_model.embeddings.position_ids.to(device=target_device)
-        self.text_encoder.transformer.text_model.embeddings.position_embedding = self.text_encoder.transformer.text_model.embeddings.position_embedding.to(dtype=torch.float32)
-        self.text_encoder.transformer.text_model.embeddings.token_embedding = self.text_encoder.transformer.text_model.embeddings.token_embedding.to(dtype=torch.float32)
+        self.text_encoder.transformer.embeddings.position_ids = self.text_encoder.transformer.embeddings.position_ids.to(device=target_device)
+        self.text_encoder.transformer.embeddings.position_embedding = self.text_encoder.transformer.embeddings.position_embedding.to(dtype=torch.float32)
+        self.text_encoder.transformer.embeddings.token_embedding = self.text_encoder.transformer.embeddings.token_embedding.to(dtype=torch.float32)
 
         tokens = tokens.to(target_device)
 
@@ -112,13 +112,16 @@ class ClassicTextProcessingEngine:
         z = outputs.hidden_states[layer_id]
 
         if self.final_layer_norm:
-            z = self.text_encoder.transformer.text_model.final_layer_norm(z)
+            z = self.text_encoder.transformer.final_layer_norm(z)
 
         if self.return_pooled:
             pooled_output = outputs.pooler_output
 
             if self.text_projection and self.embedding_key != "clip_l":
-                pooled_output = self.text_encoder.transformer.text_projection(pooled_output)
+                if hasattr(self.text_encoder.transformer, 'text_projection'):
+                    pooled_output = self.text_encoder.transformer.text_projection(pooled_output)
+                elif hasattr(self.text_encoder, 'text_projection'):
+                    pooled_output = self.text_encoder.text_projection(pooled_output)
 
             z.pooled = pooled_output
         return z
