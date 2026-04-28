@@ -85,7 +85,21 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 with using_forge_operations(**to_args, manual_cast_enabled=True):
                     model = IntegratedCLIP(CLIPTextModel, config, add_text_projection=True).to(**to_args)
 
-            load_state_dict(model, state_dict, ignore_errors=["transformer.text_projection.weight", "transformer.text_model.embeddings.position_ids", "logit_scale"], log_name=cls_name)
+            # transformers 5.x flattened CLIPTextModel: text_model.X -> X
+            # SD checkpoint keys use "text_model.X", Nunchaku keys use "transformer.text_model.X"
+            # Strip all known wrapper prefixes, then re-add "transformer." for IntegratedCLIP
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                clean = k
+                clean = clean.removeprefix("transformer.")
+                clean = clean.removeprefix("text_model.")
+                new_state_dict[f"transformer.{clean}"] = v
+            load_state_dict(model, new_state_dict, ignore_errors=[
+                "transformer.text_projection.weight",
+                "transformer.embeddings.position_ids",       # transformers 5.x
+                "transformer.text_model.embeddings.position_ids",  # transformers 4.x compat
+                "logit_scale",
+            ], log_name=cls_name)
 
             return model
         if cls_name == "Qwen2_5_VLForConditionalGeneration":

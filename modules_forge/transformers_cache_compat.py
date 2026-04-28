@@ -20,8 +20,9 @@ _diffusers_import_utils_patched = False
 
 @contextmanager
 def _no_init_weights():
-    """Shim compatible with transformers 4.x modeling_utils.no_init_weights().
-    Disables torch.nn.init ops inside the context so weight init is skipped."""
+    """Shim compatible with transformers 4.x/5.x modeling_utils.no_init_weights().
+    Disables torch.nn.init ops and PreTrainedModel.init_weights inside the
+    context so weight initialisation is skipped."""
     import torch
 
     _skip = {
@@ -44,6 +45,17 @@ def _no_init_weights():
     def _noop(*args, **kwargs):
         pass
 
+    # Also patch PreTrainedModel.init_weights (transformers 5.x calls this
+    # automatically during construction; the native no_init_weights does the
+    # same).
+    _original_init_weights = None
+    try:
+        from transformers.modeling_utils import PreTrainedModel
+        _original_init_weights = PreTrainedModel.init_weights
+        PreTrainedModel.init_weights = _noop
+    except Exception:
+        pass
+
     try:
         for name in _skip:
             setattr(torch.nn.init, name, _noop)
@@ -51,6 +63,8 @@ def _no_init_weights():
     finally:
         for name, fn in _skip.items():
             setattr(torch.nn.init, name, fn)
+        if _original_init_weights is not None:
+            PreTrainedModel.init_weights = _original_init_weights
 
 
 def _patch_no_init_weights(mod):
