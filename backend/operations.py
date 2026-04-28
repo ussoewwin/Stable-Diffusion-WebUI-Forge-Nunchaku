@@ -129,7 +129,7 @@ class ForgeOperations:
             self.in_features = in_features
             self.out_features = out_features
             self.dummy = torch.nn.Parameter(torch.empty(1, device=current_device, dtype=current_dtype))
-            self.weight = torch.empty([0], device=current_device, dtype=current_dtype)  # SVDQW4A4Linear.from_linear
+            self.weight = torch.nn.Parameter(torch.empty([0], device=current_device, dtype=current_dtype))  # SVDQW4A4Linear.from_linear
             self.scale_weight = None
             self.bias = None
             self.parameters_manual_cast = current_manual_cast_enabled
