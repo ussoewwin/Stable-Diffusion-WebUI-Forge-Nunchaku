@@ -159,6 +159,9 @@ This project is built upon the following repositories:
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)**  
   Labeling extension for Web UI (DeepDanbooru etc.) by [@picobyte](https://github.com/picobyte)
 
+- **[sd-webui-ar](https://github.com/alemelis/sd-webui-ar) (original)**  
+  Origin of the built-in aspect ratio selector integration (local Gradio 4 compatibility adaptation)
+
 ## License
 
 This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
@@ -175,5 +178,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
+- **[sd-webui-ar (original)](https://github.com/alemelis/sd-webui-ar)** - MIT
 
 See [LICENSE](LICENSE) file for details.
