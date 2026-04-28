@@ -15,7 +15,7 @@
   - Fixed transformers 5.6.2 CLIP loading path for SDXL/Nunchaku by normalizing checkpoint key prefixes in `backend/loader.py` (`transformer.` / `text_model.` cleanup then re-map).
   - Updated CLIP text processing access paths for transformers 5.x flattening in `backend/text_processing/classic_engine.py` (`text_model.*` -> direct model attributes).
   - Improved no-init compatibility shim for transformers 5.x in `modules_forge/transformers_cache_compat.py` by patching `PreTrainedModel.init_weights` inside context and restoring it safely.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.9) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.4.9) for details.
 
 ## Version 1.4.8
 
