@@ -7,7 +7,7 @@
   - Added a calculator panel (`Calc`) to compute target resolution from megapixels, aspect ratio, and divisibility (8/16/32/64), then apply directly to width/height sliders.
   - Added configurable presets via `aspect_ratios.txt` and `resolutions.txt`.
   - Integrated MIT-attributed calculation logic adaptation from `ControlAltAI-Nodes` into the Forge extension structure.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.5.0) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.5.0) for details.
 
 ## Version 1.4.9
 
