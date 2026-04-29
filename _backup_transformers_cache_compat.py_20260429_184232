@@ -130,11 +130,6 @@ def _hooked_import(name, *args, **kwargs):
     if name == "diffusers.utils.import_utils":
         _patch_diffusers_flash_attn_flag(mod)
 
-    # numpy >= 2.4 compatibility: _blas_supports_fpe stub for scipy < 1.18
-    if name in ("numpy._core._multiarray_umath", "numpy.core._multiarray_umath"):
-        if not hasattr(mod, "_blas_supports_fpe"):
-            mod._blas_supports_fpe = lambda x: False
-
     return mod
 
 
