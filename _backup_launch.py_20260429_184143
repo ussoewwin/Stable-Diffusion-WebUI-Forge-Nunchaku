@@ -36,13 +36,7 @@ def patch_numpy_core():
                     class _ArrayAPI:
                         pass
                     np.core.multiarray._ARRAY_API = _ArrayAPI()
-
-                # numpy >= 2.4 compatibility: _blas_supports_fpe was removed but
-                # scipy < 1.18 still references it (e.g. scipy.stats import chain).
-                # Inject a no-op stub before any scipy import happens.
-                if not hasattr(_multiarray_umath, '_blas_supports_fpe'):
-                    _multiarray_umath._blas_supports_fpe = lambda x: False
-
+                
                 # Register in sys.modules so cv2 can find it
                 # This is critical - cv2's __init__.py does: import numpy.core.multiarray
                 sys.modules['numpy.core'] = np.core
