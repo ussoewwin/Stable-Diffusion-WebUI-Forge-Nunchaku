@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.5.1
+
+- **NumPy 2.4.4 startup compatibility fix**
+  - Fixed startup crashes caused by SciPy/diffusers import chains when running with `numpy==2.4.4` by adding `_blas_supports_fpe` compatibility stubs in `launch.py` and `modules_forge/transformers_cache_compat.py`.
+  - Updated runtime dependency pins in `requirements.txt` (`Pillow`, `accelerate`, `numpy`, `diffusers`, `protobuf`) to align with the current tested environment.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.5.1) for details.
+
 ## Version 1.5.0
 
 - **Built-in Aspect Ratio extension with resolution calculator**
