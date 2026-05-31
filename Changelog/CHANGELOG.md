@@ -1,6 +1,15 @@
 # Changelog
 
+## Version 1.6.0
+
+- **ComfyUI-master update and comfy_aimdo compatibility fixes**
+  - Updated the stub packages of `comfy_aimdo` by creating `vram_buffer.py` (`VRAMBuffer` class) and extending `control.py` (`init_devices` method) to ensure compatibility with updated ComfyUI-master startup sequences without the proprietary AIMDO library.
+  - Resolved `ModuleNotFoundError: No module named 'comfy_aimdo.vram_buffer'` during startup.
+  - Added documentation under `docs/aimdo_compatibility_fix_report.md` detailing error traceback, root cause, and explanation of modifications.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.6.0) for details.
+
 ## Version 1.5.1
+
 
 - **NumPy 2.4.4 startup compatibility fix**
   - Fixed startup crashes caused by SciPy/diffusers import chains when running with `numpy==2.4.4` by adding `_blas_supports_fpe` compatibility stubs in `launch.py` and `modules_forge/transformers_cache_compat.py`.
