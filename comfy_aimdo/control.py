@@ -9,6 +9,10 @@ def init_device(device_index):
     return False
 
 
+def init_devices(devices):
+    return False
+
+
 def get_total_vram_usage():
     """Return 0 so comfy.windows.get_free_ram() falls back to normal calculation."""
     return 0
