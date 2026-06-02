@@ -4,9 +4,8 @@ pillow-jxl-plugin
 accelerate==1.13.0
 blendmodes==2025
 numpy==2.4.4
-bitsandbytes==0.48.0
 clean-fid==0.1.35
-diffusers==0.37.1
+diffusers==0.38.0
 diskcache==5.6.3
 einops==0.8.1
 facexlib==0.3.0
@@ -44,7 +43,7 @@ psutil==5.9.8
 pydantic-core==2.23.4
 pydantic==2.9.2
 resize-right==0.0.2
-safetensors==0.6.2
+safetensors==0.8.0rc0
 scikit-image==0.25.2
 setuptools==69.5.1
 spandrel-extra-arches==0.2.0
