@@ -1,21 +1,38 @@
-/** Map forge_preset value to LoRA extra-networks filter index (sd=0, xl=1, flux=2, all=3). */
+const FORGE_PRESET_FILTER_INDEX = { sd: 0, xl: 1, flux: 2, qwen: 3, lumina: 3, all: 3 };
+
+/** Map UI Preset dropdown value to LoRA filter index (sd=0, xl=1, flux=2, all=3). */
 function getForgeUIPresetFilterIndex() {
     const root = gradioApp().querySelector("#forge_ui_preset");
     if (!root) return 3;
 
-    const select = root.querySelector("select");
-    if (select && select.value) {
-        const v = select.value;
-        if (v === "sd") return 0;
-        if (v === "xl") return 1;
-        if (v === "flux") return 2;
+    const readValue = (v) => {
+        if (!v) return null;
+        const key = String(v).toLowerCase();
+        if (key in FORGE_PRESET_FILTER_INDEX) return FORGE_PRESET_FILTER_INDEX[key];
         return 3;
+    };
+
+    const select = root.querySelector("select");
+    if (select) {
+        const idx = readValue(select.value);
+        if (idx !== null) return idx;
     }
 
     const inputs = root.querySelectorAll("input");
     for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i].checked) return i;
+        const inp = inputs[i];
+        if (inp.type === "hidden" && inp.value) {
+            const idx = readValue(inp.value);
+            if (idx !== null) return idx;
+        }
+        if (inp.type === "radio" && inp.checked) return i;
     }
+
+    if (typeof opts !== "undefined" && opts.forge_preset) {
+        const idx = readValue(opts.forge_preset);
+        if (idx !== null) return idx;
+    }
+
     return 3;
 }
 
@@ -107,20 +124,22 @@ function setupExtraNetworksForTab(tabname) {
                         });
 
                         sdversion = elem.getAttribute("data-sort-sdversion");
-                        if (sdversion == null);
-                        else if (sdversion == "SdVersion.Unknown");
-                        else if (opts.lora_filter_disabled == True);
-                        else if (UIresult == 3); //  'all'
-                        else if (UIresult == 0) {
-                            //  'sd'
-                            if (sdversion != "SdVersion.SD1")
+                        const versionFilterActive =
+                            UIresult !== 3 && opts.lora_filter_disabled !== true;
+
+                        if (versionFilterActive) {
+                            if (
+                                sdversion == null ||
+                                sdversion === "SdVersion.Unknown"
+                            ) {
                                 visible = false;
-                        } else if (UIresult == 1) {
-                            //  'xl'
-                            if (sdversion != "SdVersion.SDXL") visible = false;
-                        } else if (UIresult == 2) {
-                            //  'flux'
-                            if (sdversion != "SdVersion.Flux") visible = false;
+                            } else if (UIresult === 0) {
+                                if (sdversion !== "SdVersion.SD1") visible = false;
+                            } else if (UIresult === 1) {
+                                if (sdversion !== "SdVersion.SDXL") visible = false;
+                            } else if (UIresult === 2) {
+                                if (sdversion !== "SdVersion.Flux") visible = false;
+                            }
                         }
 
                         if (visible) {
@@ -629,21 +648,10 @@ function extraNetworksControlTreeViewOnClick(
 }
 
 function clickLoraRefresh() {
-    const targets = [
-        "txt2img_lora",
-        "txt2img_checkpoints",
-        "txt2img_textural_inversion",
-        "img2img_lora",
-        "img2img_checkpoints",
-        "img2img_textural_inversion",
-    ];
-    targets.forEach(function (t) {
-        const tab = gradioApp().getElementById(t + "-button");
-        if (tab && tab.getAttribute("aria-selected") == "true") {
-            const applyFunction = extraNetworksApplyFilter[t];
-            if (applyFunction) {
-                applyFunction(true);
-            }
+    ["txt2img_lora", "img2img_lora"].forEach(function (key) {
+        const applyFunction = extraNetworksApplyFilter[key];
+        if (applyFunction) {
+            applyFunction(true);
         }
     });
 }
