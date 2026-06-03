@@ -1,14 +1,5 @@
 # Changelog
 
-## Version 1.6.2
-
-- **LoRA tab: UI Preset version filter**
-  - Fixed LoRA Extra Networks list showing all models regardless of UI Preset (SD1.5 / SDXL / Flux).
-  - Default **Always show all networks on the Lora page** is now off so the UI Preset drives SD1 / SDXL / Flux / All filtering unless you enable that setting.
-  - Improved reading the UI Preset dropdown value under Gradio 4 (with fallback to saved `forge_preset`).
-  - SD1 / SDXL / Flux preset selection now hides cards without a known version or marked as `SdVersion.Unknown`.
-  - Changing UI Preset refreshes the LoRA filter on both txt2img and img2img LoRA tabs.
-
 ## Version 1.6.1
 
 - **UI Preset control: radio buttons to dropdown**
