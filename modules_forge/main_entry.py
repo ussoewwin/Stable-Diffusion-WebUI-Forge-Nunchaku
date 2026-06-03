@@ -10,7 +10,18 @@ from modules import infotext_utils, paths, processing, sd_models, shared, shared
 
 total_vram = int(memory_management.total_vram)
 
-ui_forge_preset: gr.Radio = None
+ui_forge_preset: gr.Dropdown = None
+
+# (display label, stored value) — order matches legacy radio indices for extraNetworks.js LoRA filter
+FORGE_UI_PRESET_CHOICES = [
+    ("SD1.5", "sd"),
+    ("SDXL", "xl"),
+    ("Flux", "flux"),
+    ("Qwen", "qwen"),
+    ("Lumina", "lumina"),
+]
+
+FORGE_UI_PRESET_VALUES = [v for _, v in FORGE_UI_PRESET_CHOICES]
 
 ui_checkpoint: gr.Dropdown = None
 ui_vae: gr.Dropdown = None
@@ -62,7 +73,14 @@ def make_checkpoint_manager_ui():
         if len(sd_models.checkpoints_list) > 0:
             shared.opts.set("sd_model_checkpoint", next(iter(sd_models.checkpoints_list.values())).name)
 
-    ui_forge_preset = gr.Radio(label="UI Preset", value=lambda: shared.opts.forge_preset, choices=("sd", "xl", "flux", "qwen", "lumina"), elem_id="forge_ui_preset")
+    ui_forge_preset = gr.Dropdown(
+        label="UI Preset",
+        value=lambda: shared.opts.forge_preset,
+        choices=FORGE_UI_PRESET_CHOICES,
+        elem_id="forge_ui_preset",
+        scale=0,
+        min_width=120,
+    )
 
     ui_checkpoint = gr.Dropdown(label="Checkpoint", value=None, choices=None, elem_id="setting_sd_model_checkpoint", elem_classes=["model_selection"])
 
