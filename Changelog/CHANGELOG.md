@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.6.1
+
+- **UI Preset control: radio buttons to dropdown**
+  - Replaced the horizontal SD1.5 / SDXL / Flux / Qwen / Lumina radio preset selector with a **UI Preset** dropdown in the checkpoint manager row (same row as Checkpoint, VAE, and Diffusion in Low Bits).
+  - Dropdown labels: SD1.5 (`sd`), SDXL (`xl`), Flux (`flux`), Qwen (`qwen`), Lumina (`lumina`). Existing preset-change behavior (resolution, CFG, sampler, VAE modules, Clip Skip, checkpoint paths) is unchanged.
+  - **LoRA tab:** Updated Extra Networks filtering in `javascript/extraNetworks.js` to read the dropdown value instead of legacy radio `checked` state (with a fallback if the old radio UI is still present).
+
 ## Version 1.6.0
 
 - **ComfyUI-master update and comfy_aimdo compatibility fixes**
