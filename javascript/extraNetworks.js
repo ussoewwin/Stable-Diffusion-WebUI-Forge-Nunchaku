@@ -1,3 +1,24 @@
+/** Map forge_preset value to LoRA extra-networks filter index (sd=0, xl=1, flux=2, all=3). */
+function getForgeUIPresetFilterIndex() {
+    const root = gradioApp().querySelector("#forge_ui_preset");
+    if (!root) return 3;
+
+    const select = root.querySelector("select");
+    if (select && select.value) {
+        const v = select.value;
+        if (v === "sd") return 0;
+        if (v === "xl") return 1;
+        if (v === "flux") return 2;
+        return 3;
+    }
+
+    const inputs = root.querySelectorAll("input");
+    for (let i = 0; i < inputs.length; i++) {
+        if (inputs[i].checked) return i;
+    }
+    return 3;
+}
+
 function toggleCss(key, css, enable) {
     let style = document.getElementById(key);
     if (enable && !style) {
@@ -61,15 +82,8 @@ function setupExtraNetworksForTab(tabname) {
             let applyFilter = function (force) {
                 let searchTerm = search.value.toLowerCase();
 
-                // get UI preset
-                radioUI = gradioApp().querySelector("#forge_ui_preset");
-                radioButtons = radioUI.getElementsByTagName("input");
-                UIresult = 3; //  default to 'all'
-                for (i = 0; i < radioButtons.length; i++) {
-                    if (radioButtons[i].checked) {
-                        UIresult = i;
-                    }
-                }
+                // get UI preset (dropdown or legacy radio)
+                UIresult = getForgeUIPresetFilterIndex();
 
                 gradioApp()
                     .querySelectorAll("#" + tabname + "_extra_tabs div.card")
