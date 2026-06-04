@@ -27,16 +27,15 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
 
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
-  - Dedicated **UI Preset: Anima** — Euler + Simple scheduler, 1024×1024, CFG 4.5, Shift 3.0
+  - Dedicated **UI Preset: Anima** in the Forge checkpoint panel
   - Load **Additional modules**: `qwen_3_06b_base.safetensors` (Qwen3 text encoder), `qwen_image_vae.safetensors` (VAE)
   - T5 tokenizer vocabulary for `llm_adapter` cross-attention (no separate T5/UMT5 weight file required)
-  - Native `backend.nn.anima` UNet + flow-matching sampler; Shift slider applies to the noise schedule
 
   <p align="center">
     <img src="png/anima.png" alt="Anima UI preset and txt2img example" width="400">
   </p>
 
-  *Anima preset: checkpoint, additional modules, and sample output*
+  *Anima preset workflow example*
 
 - **Union ControlNet for Flux1, Nunchaku Flux1, and Nunchaku Qwen Image**
   - ✅ **Union ControlNet support for Flux1 and Nunchaku Flux1 models**
