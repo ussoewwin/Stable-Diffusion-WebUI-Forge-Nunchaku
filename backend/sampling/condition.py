@@ -105,12 +105,23 @@ def compile_conditions(cond):
         ]
 
     cross_attn = cond["crossattn"]
-    pooled_output = cond["vector"]
+    pooled_output = cond.get("vector")
 
-    result = dict(cross_attn=cross_attn, pooled_output=pooled_output, model_conds=dict(c_crossattn=ConditionCrossAttn(cross_attn), y=Condition(pooled_output)))
+    result = dict(
+        cross_attn=cross_attn,
+        pooled_output=pooled_output,
+        model_conds=dict(
+            c_crossattn=ConditionCrossAttn(cross_attn),
+            y=Condition(pooled_output) if pooled_output is not None else None,
+        ),
+    )
 
     if "guidance" in cond:
         result["model_conds"]["guidance"] = Condition(cond["guidance"])
+
+    for key in ("t5xxl_ids", "t5xxl_weights"):
+        if key in cond and cond[key] is not None:
+            result["model_conds"][key] = Condition(cond[key])
 
     return [
         result,

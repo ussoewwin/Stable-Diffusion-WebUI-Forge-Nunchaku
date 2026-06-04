@@ -11,6 +11,7 @@ import backend.args
 from backend import memory_management
 from backend.diffusion_engine.chroma import Chroma
 from backend.diffusion_engine.flux import Flux
+from backend.diffusion_engine.anima import Anima
 from backend.diffusion_engine.lumina import Lumina2
 from backend.diffusion_engine.qwen import QwenImage
 from backend.diffusion_engine.sd15 import StableDiffusion
@@ -27,8 +28,9 @@ from backend.utils import (
     load_torch_file,
     read_arbitrary_config,
 )
+from modules_forge.packages.huggingface_guess import model_list
 
-possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, QwenImage, Lumina2, ZImage]
+possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, QwenImage, Anima, Lumina2, ZImage]
 
 
 logging.getLogger("diffusers").setLevel(logging.ERROR)
@@ -171,9 +173,13 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 print(f"[Loader] Qwen3Model skipped: state_dict has {len(state_dict) if isinstance(state_dict, dict) else 0} keys. Wrong checkpoint? (SDXL may be misdetected as Qwen)")
                 return None
 
-            from backend.nn.llm.llama import Qwen3_4B
-
             config = read_arbitrary_config(config_path)
+            _anima_te = isinstance(guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68))
+
+            if _anima_te:
+                from backend.nn.llm.llama import Qwen3_06B as QTE
+            else:
+                from backend.nn.llm.llama import Qwen3_4B as QTE
 
             storage_dtype = memory_management.text_encoder_dtype()
             state_dict_dtype = memory_management.state_dict_dtype(state_dict)
@@ -191,13 +197,16 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             if storage_dtype in ["nf4", "fp4", "gguf"]:
                 with modeling_utils.no_init_weights():
                     with using_forge_operations(device=memory_management.cpu, dtype=memory_management.text_encoder_dtype(), manual_cast_enabled=False, bnb_dtype=storage_dtype):
-                        model = Qwen3_4B(config)
+                        model = QTE(config)
             else:
                 with modeling_utils.no_init_weights():
                     with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
-                        model = Qwen3_4B(config)
+                        model = QTE(config)
 
-            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
+            if _anima_te:
+                load_state_dict(model, state_dict, log_name=cls_name, ignore_start="lm_head.")
+            else:
+                load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
 
             return model
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
@@ -242,7 +251,15 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=["transformer.encoder.embed_tokens.weight", "logit_scale"])
 
             return model
-        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "ChromaTransformer2DModel", "QwenImageTransformer2DModel", "Lumina2Transformer2DModel", "ZImageTransformer2DModel"]:
+        if cls_name in [
+            "UNet2DConditionModel",
+            "FluxTransformer2DModel",
+            "ChromaTransformer2DModel",
+            "QwenImageTransformer2DModel",
+            "Lumina2Transformer2DModel",
+            "ZImageTransformer2DModel",
+            "CosmosTransformer3DModel",
+        ]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have model state dict!"
 
             model_loader = None
@@ -308,6 +325,18 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     # ComfyUI BaseModel sets operations in unet_config before calling unet_model(**unet_config, ...)
                     guess.unet_config["operations"] = comfy.ops.manual_cast
                     model_loader = lambda c: NextDiT(**c)
+            elif cls_name == "CosmosTransformer3DModel" and isinstance(
+                guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68)
+            ):
+                from backend.nn.anima import Anima
+                from backend.nn.comfy_anima import native_anima_unet_config
+
+                if isinstance(state_dict, dict):
+                    from backend.nn.comfy_anima import _remap_anima_state_dict
+
+                    state_dict = _remap_anima_state_dict(state_dict)
+                guess.unet_config = native_anima_unet_config(guess.unet_config)
+                model_loader = lambda c: Anima(**native_anima_unet_config(c))
 
             unet_config = guess.unet_config.copy()
             
@@ -655,8 +684,15 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
 
     elif "model.layers.0.post_attention_layernorm.weight" in asd:
         assert "model.layers.0.self_attn.q_norm.weight" in asd
-        for k, v in asd.items():
-            sd[f"{text_encoder_key_prefix}qwen3_4b.transformer.{k}"] = v
+        weight = asd["model.layers.0.post_attention_layernorm.weight"]
+        if weight.shape[0] == 1024 and "Anima" in getattr(guess, "huggingface_repo", ""):
+            for k, v in asd.items():
+                if k == "spiece_model":
+                    continue
+                sd[f"{text_encoder_key_prefix}qwen3_06b.transformer.{k}"] = v
+        else:
+            for k, v in asd.items():
+                sd[f"{text_encoder_key_prefix}qwen3_4b.transformer.{k}"] = v
 
     return sd
 
@@ -671,7 +707,27 @@ def preprocess_state_dict(sd):
 def split_state_dict(sd, additional_state_dicts: list = None):
     sd, metadata = load_torch_file(sd, return_metadata=True)
     sd = preprocess_state_dict(sd)
-    guess = huggingface_guess.guess(sd)
+
+    from modules_forge.packages.huggingface_guess import model_list
+    from modules_forge.packages.huggingface_guess.detection import detect_unet_config, unet_prefix_from_state_dict
+
+    prefix = unet_prefix_from_state_dict(sd)
+    anima_cfg = detect_unet_config(sd, prefix)
+    if anima_cfg.get("image_model") == "anima" and "in_channels" in anima_cfg:
+        in_ch = int(anima_cfg["in_channels"])
+        dim = int(anima_cfg.get("dim", 2048))
+        from backend.nn.comfy_anima import infer_anima_unet_config_from_state_dict, native_anima_unet_config
+
+        full_cfg = infer_anima_unet_config_from_state_dict(sd, prefix)
+        anima_cfg.update(native_anima_unet_config(full_cfg))
+        if in_ch == 68 and dim == 2048:
+            guess = model_list.AnimaWai68(anima_cfg)
+        elif dim == 2048:
+            guess = model_list.AnimaBase(anima_cfg)
+        else:
+            guess = model_list.Anima(anima_cfg)
+    else:
+        guess = huggingface_guess.guess(sd)
 
     if getattr(guess, "nunchaku", False) and ("Z-Image" in guess.huggingface_repo or "Qwen" in guess.huggingface_repo):
         import json
@@ -705,6 +761,14 @@ def split_state_dict(sd, additional_state_dicts: list = None):
     for k, v in guess.clip_target.items():
         state_dict[v] = try_filter_state_dict(sd, [k + "."])
 
+    if "Anima" in getattr(guess, "huggingface_repo", ""):
+        unet_sd = state_dict.get(guess.unet_target)
+        te_sd = state_dict.get("text_encoder")
+        if isinstance(unet_sd, dict) and isinstance(te_sd, dict):
+            for k in list(unet_sd.keys()):
+                if k.startswith("llm_adapter"):
+                    te_sd[k] = unet_sd.pop(k)
+
     state_dict["ignore"] = sd
 
     print_dict = {k: len(v) for k, v in state_dict.items()}
@@ -723,9 +787,10 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
         from modules.errors import display
 
         display(e, "forge_loader")
-        raise ValueError("Failed to recognize model type!")
+        raise ValueError("Failed to recognize model type!") from e
 
     repo_name = estimated_config.huggingface_repo
+
     backend.args.dynamic_args["kontext"] = "kontext" in str(sd).lower()
     backend.args.dynamic_args["edit"] = "qwen" in str(sd).lower() and "edit" in str(sd).lower()
     backend.args.dynamic_args["nunchaku"] = getattr(estimated_config, "nunchaku", False)

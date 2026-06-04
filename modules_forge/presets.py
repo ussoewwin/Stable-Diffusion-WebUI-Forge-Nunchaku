@@ -17,6 +17,7 @@ class PresetArch(Enum):
     flux = 3
     qwen = 4
     lumina = 5
+    anima = 6
 
 
 SAMPLERS = {
@@ -25,6 +26,7 @@ SAMPLERS = {
     PresetArch.flux: "Euler",
     PresetArch.qwen: "LCM",
     PresetArch.lumina: "Res Multistep",
+    PresetArch.anima: "Euler",
 }
 
 SCHEDULERS = {
@@ -33,6 +35,7 @@ SCHEDULERS = {
     PresetArch.flux: "Beta",
     PresetArch.qwen: "Normal",
     PresetArch.lumina: "Linear Quadratic",
+    PresetArch.anima: "Simple",
 }
 
 WIDTH = {
@@ -41,6 +44,7 @@ WIDTH = {
     PresetArch.flux: 896,
     PresetArch.qwen: 896,
     PresetArch.lumina: 1024,
+    PresetArch.anima: 1024,
 }
 
 HEIGHT = {
@@ -49,6 +53,7 @@ HEIGHT = {
     PresetArch.flux: 1152,
     PresetArch.qwen: 1152,
     PresetArch.lumina: 1024,
+    PresetArch.anima: 1024,
 }
 
 CFG = {
@@ -57,6 +62,7 @@ CFG = {
     PresetArch.flux: 1.0,
     PresetArch.qwen: 1.0,
     PresetArch.lumina: 4.5,
+    PresetArch.anima: 4.5,
 }
 
 
@@ -115,6 +121,17 @@ def register(options_templates: dict, options_section: Callable, OptionInfo: "Op
                 "flux_t2i_d_cfg": OptionInfo(3.0, "txt2img Distilled CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
                 "flux_t2i_hr_d_cfg": OptionInfo(3.0, "txt2img Distilled Hires. CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
                 "flux_i2i_d_cfg": OptionInfo(3.0, "img2img Distilled CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+            },
+        )
+    )
+
+    options_templates.update(
+        options_section(
+            ("ui_anima", "Anima", "presets"),
+            {
+                "anima_t2i_d_cfg": OptionInfo(3.0, "txt2img Distilled CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+                "anima_t2i_hr_d_cfg": OptionInfo(3.0, "txt2img Distilled Hires. CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
+                "anima_i2i_d_cfg": OptionInfo(3.0, "img2img Distilled CFG", gr.Slider, {"minimum": 1, "maximum": 10, "step": 0.1}),
             },
         )
     )

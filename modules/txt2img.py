@@ -21,6 +21,9 @@ def txt2img_create_processing(id_task: str, request: gr.Request, prompt: str, ne
     if force_enable_hr:
         enable_hr = True
 
+    batch_size = int(batch_size) if isinstance(batch_size, float) else batch_size
+    n_iter = int(n_iter) if isinstance(n_iter, float) else n_iter
+
     p = processing.StableDiffusionProcessingTxt2Img(
         outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
@@ -53,6 +56,11 @@ def txt2img_create_processing(id_task: str, request: gr.Request, prompt: str, ne
 
     p.scripts = modules.scripts.scripts_txt2img
     p.script_args = args
+
+    if not getattr(p, "sampler_name", None) or not isinstance(p.sampler_name, str):
+        p.sampler_name = getattr(shared.opts, "sampler", "Euler")
+    if not getattr(p, "scheduler", None) or not isinstance(p.scheduler, str):
+        p.scheduler = getattr(shared.opts, "scheduler", "Simple")
 
     p.user = request.username
 

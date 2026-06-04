@@ -41,9 +41,18 @@ class BASE:
 
     @classmethod
     def matches(cls, unet_config, state_dict=None):
-        for k in cls.unet_config:
-            if k not in unet_config or cls.unet_config[k] != unet_config[k]:
+        for k, v in cls.unet_config.items():
+            if k not in unet_config:
                 return False
+            if unet_config[k] != v and k != "in_channels":
+                return False
+            if k == "in_channels":
+                if int(unet_config[k]) != int(v):
+                    return False
+        if state_dict is not None:
+            for k in cls.required_keys:
+                if k not in state_dict:
+                    return False
         if state_dict is not None:
             for k in cls.required_keys:
                 if k not in state_dict:
@@ -349,6 +358,132 @@ class Lumina2(BASE):
             return {"gemma2_2b": "text_encoder"}
 
 
+class AnimaBase(BASE):
+    """Anima Base（dim=2048, 28 blocks）— ComfyUI comfy.ldm.anima.model と同型。"""
+
+    huggingface_repo = "circlestone-labs/Anima"
+
+    unet_config = {
+        "image_model": "anima",
+        "dim": 2048,
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 3.0,
+    }
+
+    unet_extra_config = {}
+    required_keys = {}
+
+    unet_key_prefix = ["model.diffusion_model."]
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    memory_usage_factor = 2.0
+    supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
+
+    latent_format = latent.Wan21
+
+    @classmethod
+    def matches(cls, unet_config, state_dict=None):
+        if unet_config.get("image_model") != "anima":
+            return False
+        if state_dict is not None:
+            keys = list(state_dict.keys())
+            if not any(
+                k.startswith("model.diffusion_model.x_embedder.proj.1.weight") or k.startswith("x_embedder.proj.1.weight")
+                for k in keys
+            ):
+                return False
+        return True
+
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+    def clip_target(self, state_dict: dict):
+        pref = self.text_encoder_key_prefix[0]
+        targets = {}
+        if "{}qwen3_06b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
+            targets["qwen3_06b.transformer"] = "text_encoder"
+        elif any(k.startswith("{}qwen3_06b.".format(pref)) for k in state_dict):
+            targets["qwen3_06b"] = "text_encoder"
+        return targets
+
+
+class AnimaWai68(AnimaBase):
+    """Anima 68ch 入力（例: waiANIMA_pw3）。"""
+
+    unet_config = {
+        "image_model": "anima",
+        "dim": 2048,
+        "in_channels": 68,
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 3.0,
+    }
+
+
+class Anima(BASE):
+    """Anima（dim=5120, 36 blocks）。"""
+
+    huggingface_repo = "circlestone-labs/Anima"
+
+    unet_config = {
+        "image_model": "anima",
+        "dim": 5120,
+    }
+
+    unet_extra_config = {}
+    required_keys = {}
+
+    unet_key_prefix = ["model.diffusion_model."]
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    memory_usage_factor = 2.0
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 3.0,
+    }
+
+    latent_format = latent.Wan21
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
+
+    @classmethod
+    def matches(cls, unet_config, state_dict=None):
+        if unet_config.get("image_model") != "anima":
+            return False
+        if state_dict is not None:
+            keys = list(state_dict.keys())
+            if not any(
+                k.startswith("model.diffusion_model.x_embedder.proj.1.weight") or k.startswith("x_embedder.proj.1.weight")
+                for k in keys
+            ):
+                return False
+        return True
+
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+    def clip_target(self, state_dict: dict):
+        pref = self.text_encoder_key_prefix[0]
+        targets = {}
+        if "{}qwen3_06b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
+            targets["qwen3_06b.transformer"] = "text_encoder"
+        elif any(k.startswith("{}qwen3_06b.".format(pref)) for k in state_dict):
+            targets["qwen3_06b"] = "text_encoder"
+        return targets
+
+
 class ZImageBase(Lumina2):
     """Z-Image Base（dim=1920 の小規模版）。ComfyUI-master の NextDiT と互換。"""
 
@@ -440,4 +575,7 @@ models = [
     ZImageBase,
     ZImage,
     QwenImage,
+    AnimaWai68,
+    AnimaBase,
+    Anima,
 ]

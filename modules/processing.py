@@ -39,6 +39,24 @@ opt_C = 4
 opt_f = 8
 
 
+def coerce_positive_int(value, default=1):
+    """Gradio/API may pass floats; batch_size and n_iter must be int for list repetition."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return max(1, value)
+    if isinstance(value, float):
+        return max(1, int(value))
+    if isinstance(value, str) and value.strip().isdigit():
+        return max(1, int(value.strip()))
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def setup_color_correction(image: Image.Image) -> np.ndarray:
     correction_target = cv2.cvtColor(np.asarray(image.copy(), dtype=np.uint8), cv2.COLOR_RGB2LAB)
     return correction_target
@@ -386,6 +404,9 @@ class StableDiffusionProcessing:
         return self.token_merging_ratio or opts.token_merging_ratio
 
     def setup_prompts(self):
+        self.batch_size = coerce_positive_int(self.batch_size, default=1)
+        self.n_iter = coerce_positive_int(self.n_iter, default=1)
+
         if isinstance(self.prompt, list):
             self.all_prompts = self.prompt
         elif isinstance(self.negative_prompt, list):
@@ -936,13 +957,28 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
                 # hiresfix quickbutton may not need reload of firstpass model
                 sd_models.forge_model_reload()  # model can be changed for example by refiner, hiresfix
 
+            if getattr(p.sd_model, "forge_objects_original", None) is None:
+                if getattr(p.sd_model, "forge_objects", None) is not None:
+                    p.sd_model.forge_objects_original = p.sd_model.forge_objects
+                else:
+                    from backend.diffusion_engine.base import ForgeObjects
+
+                    p.sd_model.forge_objects = ForgeObjects(unet=None, clip=None, vae=None, clipvision=None)
+                    p.sd_model.forge_objects_original = p.sd_model.forge_objects
             p.sd_model.forge_objects = p.sd_model.forge_objects_original.shallow_copy()
             p.prompts = p.all_prompts[n * p.batch_size : (n + 1) * p.batch_size]
             p.negative_prompts = p.all_negative_prompts[n * p.batch_size : (n + 1) * p.batch_size]
             p.seeds = p.all_seeds[n * p.batch_size : (n + 1) * p.batch_size]
             p.subseeds = p.all_subseeds[n * p.batch_size : (n + 1) * p.batch_size]
 
-            latent_channels = shared.sd_model.forge_objects.vae.latent_channels
+            fo = getattr(shared.sd_model, "forge_objects", None)
+            vae_obj = getattr(fo, "vae", None) if fo is not None else None
+            if vae_obj is not None and getattr(vae_obj, "latent_channels", None) is not None:
+                latent_channels = vae_obj.latent_channels
+            elif hasattr(shared.sd_model, "latent_channels"):
+                latent_channels = shared.sd_model.latent_channels
+            else:
+                latent_channels = 16
             _shape = (latent_channels, _times, p.height // opt_f, p.width // opt_f) if shared.sd_model.is_wan else (latent_channels, p.height // opt_f, p.width // opt_f)
             p.rng = rng.ImageRNG(_shape, p.seeds, subseeds=p.subseeds, subseed_strength=p.subseed_strength, seed_resize_from_h=p.seed_resize_from_h, seed_resize_from_w=p.seed_resize_from_w)
 
@@ -957,6 +993,8 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
             if not p.disable_extra_networks:
                 extra_networks.activate(p, p.extra_network_data)
 
+            if getattr(p.sd_model, "forge_objects_after_applying_lora", None) is None:
+                p.sd_model.forge_objects_after_applying_lora = p.sd_model.forge_objects_original.shallow_copy()
             p.sd_model.forge_objects = p.sd_model.forge_objects_after_applying_lora.shallow_copy()
 
             if p.scripts is not None:
