@@ -109,12 +109,27 @@ def get_hr_scheduler_from_infotext(d: dict):
     return get_hr_sampler_and_scheduler(d)[1]
 
 
+def _coerce_sampler_name(name, default_sampler=None):
+    """Gradio/script_args sometimes pass int (e.g. steps) into sampler_name."""
+    if default_sampler is None:
+        default_sampler = samplers[0] if samplers else None
+    if name is None:
+        return default_sampler.name if default_sampler else "Euler"
+    if isinstance(name, int):
+        if 0 <= name < len(samplers):
+            return samplers[name].name
+        return getattr(shared.opts, "sampler", None) or (default_sampler.name if default_sampler else "Euler")
+    if isinstance(name, str):
+        return name
+    return str(name)
+
+
 @functools.cache
 def get_sampler_and_scheduler(sampler_name, scheduler_name, *, convert_automatic=True):
     default_sampler = samplers[0]
     found_scheduler = sd_schedulers.schedulers_map.get(scheduler_name, sd_schedulers.schedulers[0])
 
-    name = sampler_name or default_sampler.name
+    name = _coerce_sampler_name(sampler_name, default_sampler)
 
     for scheduler in sd_schedulers.schedulers:
         name_options = [scheduler.label, scheduler.name, *(scheduler.aliases or [])]
@@ -136,6 +151,8 @@ def get_sampler_and_scheduler(sampler_name, scheduler_name, *, convert_automatic
 
 def fix_p_invalid_sampler_and_scheduler(p):
     i_sampler_name, i_scheduler = p.sampler_name, p.scheduler
+    p.sampler_name = _coerce_sampler_name(p.sampler_name)
+    p.scheduler = p.scheduler if isinstance(p.scheduler, str) else (getattr(shared.opts, "scheduler", None) or "Simple")
     p.sampler_name, p.scheduler = get_sampler_and_scheduler(p.sampler_name, p.scheduler, convert_automatic=False)
     if p.sampler_name != i_sampler_name or i_scheduler != p.scheduler:
         logging.warning(f'Sampler Scheduler autocorrection: "{i_sampler_name}" -> "{p.sampler_name}", "{i_scheduler}" -> "{p.scheduler}"')

@@ -20,6 +20,7 @@ FORGE_UI_PRESET_CHOICES = [
     ("Flux", "flux"),
     ("Qwen", "qwen"),
     ("Lumina", "lumina"),
+    ("Anima", "anima"),
 ]
 
 FORGE_UI_PRESET_VALUES = [v for _, v in FORGE_UI_PRESET_CHOICES]
@@ -352,10 +353,10 @@ def on_preset_change(preset: str):
     if model_mem < 0 or model_mem > total_vram:
         model_mem = total_vram - 1024
 
-    show_clip_skip = preset not in ("qwen", "lumina")
+    show_clip_skip = preset not in ("qwen", "lumina", "anima")
     show_basic_mem = preset != "sd"
     show_adv_mem = preset in ("flux", "qwen")
-    distilled = preset in ("flux", "lumina")
+    distilled = preset in ("flux", "lumina", "anima")
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"
     batch_args = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
 

@@ -34,6 +34,30 @@ class ScriptSampler(scripts.ScriptBuiltinUI):
         return self.steps, self.sampler_name, self.scheduler
 
     def setup(self, p, steps, sampler_name, scheduler):
+        if isinstance(steps, str) and steps.isdigit():
+            steps = int(steps)
+        elif isinstance(steps, int):
+            steps = int(steps)
+        elif isinstance(steps, float):
+            steps = int(steps)
+        elif not isinstance(steps, int):
+            try:
+                steps = int(steps)
+            except (TypeError, ValueError):
+                steps = getattr(p, "steps", 20)
+
+        if isinstance(sampler_name, int):
+            from modules import sd_samplers as _sd_samplers
+
+            sampler_name = _sd_samplers._coerce_sampler_name(sampler_name)
+        elif not isinstance(sampler_name, str):
+            sampler_name = str(sampler_name)
+
+        if isinstance(scheduler, int):
+            scheduler = str(scheduler)
+        elif scheduler is not None and not isinstance(scheduler, str):
+            scheduler = str(scheduler)
+
         p.steps = steps
         p.sampler_name = sampler_name
         p.scheduler = scheduler

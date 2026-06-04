@@ -10,6 +10,16 @@ import comfy.patcher_extension
 import comfy.ldm.lumina.model  # For NextDiT check in apply_model
 
 
+def _is_anima_diffusion_model(diffusion_model) -> bool:
+    """Forge native ``backend.nn.anima.Anima`` only."""
+    try:
+        from backend.nn.anima import Anima as ForgeAnima
+
+        return isinstance(diffusion_model, ForgeAnima)
+    except ImportError:
+        return False
+
+
 def reshape_sigma(sigma, noise_dim):
     if sigma.nelement() == 1:
         return sigma.view(())
@@ -219,6 +229,9 @@ class KModel(torch.nn.Module):
         xc = xc.to(dtype)
         t = self.predictor.timestep(t).float()
         context = context.to(dtype)
+        anima_temporal = _is_anima_diffusion_model(self.diffusion_model) and xc.ndim == 4
+        if anima_temporal:
+            xc = xc.unsqueeze(2)
         extra_conds = {}
         for o in kwargs:
             # Skip transformer_options as it's passed explicitly
@@ -305,6 +318,9 @@ class KModel(torch.nn.Module):
                 model_output = self.diffusion_model(xc, t, context=context, control=control, transformer_options=transformer_options, **extra_conds_clean).float()
             else:
                 model_output = self.diffusion_model(xc, t, context=context, control=control, **extra_conds_clean).float()
+
+        if anima_temporal and model_output.ndim == 5:
+            model_output = model_output.squeeze(2)
 
         return self.predictor.calculate_denoised(sigma, model_output, x)
 
