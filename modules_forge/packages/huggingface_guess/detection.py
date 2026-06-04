@@ -46,7 +46,7 @@ def calculate_transformer_depth(prefix, state_dict_keys, state_dict):
 def detect_unet_config(state_dict: dict, key_prefix: str):
     state_dict_keys = list(state_dict.keys())
 
-    # Anima（MiniTrainDIT）— x_embedder.proj.1 + llm_adapter（Lumina2/Cosmos 等へ誤判定しない）
+    # Anima (MiniTrainDIT): x_embedder.proj.1 + llm_adapter (avoid misclassifying as Lumina2/Cosmos)
     _has_anima_llm = any(k.startswith("{}llm_adapter.".format(key_prefix)) for k in state_dict_keys)
     if "{}x_embedder.proj.1.weight".format(key_prefix) in state_dict_keys and _has_anima_llm:
         w = state_dict["{}x_embedder.proj.1.weight".format(key_prefix)]
@@ -65,7 +65,7 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
     if (
         "{}cap_embedder.1.weight".format(key_prefix) in state_dict_keys
         and "{}noise_refiner.0.attention.k_norm.weight".format(key_prefix) in state_dict_keys
-    ):  # Lumina 2（noise_refiner あり。wai 等 cap のみの Anima とは区別）
+    ):  # Lumina 2: requires noise_refiner (distinguishes from cap-only Anima ckpts like wai)
         dit_config = {}
         dit_config["image_model"] = "lumina2"
         dit_config["patch_size"] = 2
@@ -95,7 +95,7 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
             dit_config["time_scale"] = 1000.0
             if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
                 dit_config["pad_tokens_multiple"] = 32
-            # Z-Image distilled: main layers の FFN が 1920 次元入力 (attention は 3840 のまま)
+            # Z-Image distilled: main-layer FFN uses 1920-dim input (attention stays 3840)
             ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
             ff_w2_key = "{}layers.0.feed_forward.w2.weight".format(key_prefix)
             if ff_w1_key in state_dict_keys and ff_w2_key in state_dict_keys:
@@ -103,9 +103,9 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
                 ff_w2 = state_dict[ff_w2_key]
                 if ff_w1.shape[1] == 1920 and ff_w2.shape[0] == 3840:
                     dit_config["ffn_input_dim"] = 1920
-                    # ゲート出力次元 = w2.in_features に合わせる (5120)
+                    # Gate output dim matches w2.in_features (5120)
                     dit_config["ffn_dim_multiplier"] = float(ff_w2.shape[1]) / 1920.0
-        elif dit_config["dim"] == 1920:  # Z-Image Base (小規模)
+        elif dit_config["dim"] == 1920:  # Z-Image Base (smaller variant)
             dit_config["nunchaku"] = "{}layers.0.attention.to_out.0.qweight".format(key_prefix) in state_dict_keys
             dit_config["n_heads"] = 30
             dit_config["n_kv_heads"] = 30
@@ -116,9 +116,9 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
             dit_config["time_scale"] = 1000.0
             if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
                 dit_config["pad_tokens_multiple"] = 32
-            # ffn_dim_multiplier は下で state_dict から推定
+            # ffn_dim_multiplier is inferred from state_dict below
 
-        # Lumina2/Z-Image: state_dict の feed_forward.w1 から ffn_dim_multiplier を推定（Z Image Base 等の変種に対応）
+        # Lumina2/Z-Image: infer ffn_dim_multiplier from feed_forward.w1 (Z-Image Base variants, etc.)
         ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
         if ff_w1_key in state_dict_keys:
             ff_w1 = state_dict[ff_w1_key]
@@ -422,13 +422,13 @@ def top_candidate(state_dict, candidates):
 
 
 def unet_prefix_from_state_dict(state_dict):
-    # 長い prefix を先に（preprocess_state_dict で model.diffusion_model. が付与された transformer.xxx 用）
+    # Longer prefixes first (for transformer.* after preprocess_state_dict adds model.diffusion_model.)
     candidates = [
-        "model.diffusion_model.transformer.",  # Forge/Lumina2/Z Image 等（transformer + model.diffusion_model 付与後）
+        "model.diffusion_model.transformer.",  # Forge/Lumina2/Z-Image (after model.diffusion_model. prefix)
         "model.diffusion_model.",  # ldm/sgm models
         "model.model.",  # audio models
         "net.",  # cosmos
-        "blocks.",  # Comfy Anima 生 ckpt（preprocess 前）
+        "blocks.",  # raw Comfy Anima ckpt (before preprocess)
     ]
     counts = {k: 0 for k in candidates}
     for k in state_dict:

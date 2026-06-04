@@ -467,7 +467,7 @@ class WanVAE(nn.Module):
         feat_map = None
         if iter_ > 1:
             feat_map = [None] * count_cache_layers(self.encoder)
-        ## 对encode输入的x，按时间拆分为1、2、2、2....(总帧数先按4N+1向下取整)
+        ## Split encode input x along time into 1, 2, 2, 2, ... (frame count floored to 4N+1 first)
         for i in range(iter_):
             conv_idx = [0]
             if i == 0:

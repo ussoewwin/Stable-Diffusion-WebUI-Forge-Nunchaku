@@ -3,7 +3,7 @@ import sys
 import torch
 from torch import nn
 
-# ComfyUI を sys.path に追加してから comfy/folder_paths を import する必要がある
+# ComfyUI must be on sys.path before importing comfy/folder_paths
 from modules.paths import comfyui_master_path
 if os.path.exists(comfyui_master_path) and comfyui_master_path not in sys.path:
     sys.path.insert(0, comfyui_master_path)

@@ -149,7 +149,7 @@ NATIVE_ANIMA_UNET_KEYS = (
 
 
 def native_anima_unet_config(dit_config: dict) -> dict:
-    """Forge ``backend.nn.anima.Anima`` kwargs from full dit config (classic CosmosTransformer3DModel)."""
+    """Forge ``backend.nn.anima.Anima`` kwargs from full dit config (Diffusers CosmosTransformer3DModel stub)."""
     return {k: dit_config[k] for k in NATIVE_ANIMA_UNET_KEYS if k in dit_config}
 
 

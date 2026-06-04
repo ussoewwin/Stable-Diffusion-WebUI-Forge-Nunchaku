@@ -1,5 +1,5 @@
 # https://github.com/GavChap/ComfyUI-QwenImageLoraLoader/blob/main/nunchaku_code/lora_qwen.py
-# Updated for ForgeNeo: Uses backend.utils.load_torch_file instead of safetensors.safe_open
+# Updated for Forge Nunchaku: Uses backend.utils.load_torch_file instead of safetensors.safe_open
 
 import logging
 import re
@@ -249,7 +249,7 @@ def _load_lora_state_dict(lora_state_dict_or_path: Union[str, Path, Dict[str, to
     str, torch.Tensor]:
     """Load LoRA state dict from path or return existing dict."""
     if isinstance(lora_state_dict_or_path, (str, Path)):
-        # Use ForgeNeo's load_torch_file which handles both safetensors and torch files
+        # Use Forge Nunchaku load_torch_file which handles both safetensors and torch files
         return load_torch_file(str(lora_state_dict_or_path), safe_load=False, device=torch.device("cpu"))
     return lora_state_dict_or_path
 

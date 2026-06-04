@@ -810,7 +810,7 @@ class NunchakuQwenImageTransformer2DModel(NunchakuModelMixin, QwenImageTransform
             )
 
         # ComfyUI-nunchaku style: time_text_embed(timestep, hidden_states, additional_t_cond)
-        # Note: ForgeNeo's QwenTimestepProjEmbeddings currently doesn't support additional_t_cond
+        # Note: Forge Nunchaku QwenTimestepProjEmbeddings currently doesn't support additional_t_cond
         # We pass it in the signature for compatibility, but it will be ignored by the underlying implementation
         # TODO: Update QwenTimestepProjEmbeddings to support additional_t_cond if needed
         temb = self.time_text_embed(timestep, hidden_states)

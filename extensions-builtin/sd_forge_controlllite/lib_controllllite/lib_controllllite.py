@@ -44,7 +44,7 @@ def load_control_net_lllite_patch(ctrl_sd, cond_image, multiplier, num_steps, st
     # load each module
     modules = {}
     for module_name, weights in module_weights.items():
-        # ここの自動判定を何とかしたい
+        # TODO: improve this auto-detection
         if "conditioning1.4.weight" in weights:
             depth = 3
         elif weights["conditioning1.2.weight"].shape[-1] == 4:
@@ -72,7 +72,7 @@ def load_control_net_lllite_patch(ctrl_sd, cond_image, multiplier, num_steps, st
 
     print(f"{len(modules)} modules")
 
-    # cond imageをセットする
+    # Set conditioning image
     cond_image = cond_image.permute(0, 3, 1, 2)  # b,h,w,3 -> b,3,h,w
     cond_image = cond_image * 2.0 - 1.0  # 0-1 -> -1-+1
 
@@ -146,7 +146,7 @@ class LLLiteModule(torch.nn.Module):
             modules.append(torch.nn.ReLU(inplace=True))
             modules.append(torch.nn.Conv2d(cond_emb_dim // 2, cond_emb_dim, kernel_size=4, stride=4, padding=0))
         elif depth == 3:
-            # kernel size 8は大きすぎるので、4にする / kernel size 8 is too large, so set it to 4
+            # kernel size 8 is too large; use 4 instead
             modules.append(torch.nn.ReLU(inplace=True))
             modules.append(torch.nn.Conv2d(cond_emb_dim // 2, cond_emb_dim // 2, kernel_size=4, stride=4, padding=0))
             modules.append(torch.nn.ReLU(inplace=True))
@@ -223,7 +223,7 @@ class LLLiteModule(torch.nn.Module):
         cx = self.cond_emb
         # print(f"forward {self.name}, {cx.shape}, {x.shape}")
 
-        # uncond/condでxはバッチサイズが2倍
+        # For uncond/cond, x batch size is doubled
         if x.shape[0] != cx.shape[0]:
             if self.is_conv2d:
                 cx = cx.repeat(x.shape[0] // cx.shape[0], 1, 1, 1)

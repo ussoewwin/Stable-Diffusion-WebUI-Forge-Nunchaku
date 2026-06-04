@@ -1,7 +1,7 @@
 """
 Nunchaku SDXL CLIP Normalization Functions
 
-完全独立ファイル: 通常のSDXLには一切影響させない。
+Standalone module: must not affect regular SDXL at all.
 Reference: https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader/releases/tag/2.0
 """
 import os
@@ -299,7 +299,7 @@ def normalize_nunchaku_clip_state_dict(sd: dict[str, torch.Tensor], label: str =
     """
     Normalize Nunchaku SDXL CLIP state dict: handle double prefix, OpenAI/OpenCLIP format, and missing text_projection.
     
-    IMPORTANT: この関数はNunchaku SDXL専用。通常のSDXLには絶対に使用しないこと。
+    IMPORTANT: Nunchaku SDXL only. Never use for regular SDXL.
     """
     # Step 0: Peel common wrappers (clip_g.*, text_encoders.clip_g.transformer.*, transformer.* etc.)
     sd = _strip_nunchaku_clip_wrappers(sd, label=label)
@@ -319,12 +319,12 @@ def normalize_nunchaku_clip_state_dict(sd: dict[str, torch.Tensor], label: str =
 
 def convert_nunchaku_clip_to_forge_format(sd: dict[str, torch.Tensor], component_name: str) -> dict[str, torch.Tensor]:
     """
-    Convert Nunchaku SDXL CLIP state dict from ComfyUI format to Forge Neo format.
+    Convert Nunchaku SDXL CLIP state dict from ComfyUI format to Forge Nunchaku format.
     
-    Forge Neo expects: transformer.text_model.*, transformer.text_projection.*
+    Forge Nunchaku expects: transformer.text_model.*, transformer.text_projection.*
     ComfyUI format: text_model.*, text_projection.*
     
-    IMPORTANT: この関数はNunchaku SDXL専用。通常のSDXLには絶対に使用しないこと。
+    IMPORTANT: Nunchaku SDXL only. Never use for regular SDXL.
     """
     # First remove clip_l./clip_g. prefix if present
     prefix_to_remove = None
@@ -346,7 +346,7 @@ def convert_nunchaku_clip_to_forge_format(sd: dict[str, torch.Tensor], component
     # Normalize (handle double prefix, OpenAI format, etc.)
     sd = normalize_nunchaku_clip_state_dict(sd, label=component_name)
     
-    # Convert to Forge Neo format: text_model.* -> transformer.text_model.*
+    # Convert to Forge Nunchaku format: text_model.* -> transformer.text_model.*
     state_dict_forge = {}
     for key, val in sd.items():
         if key.startswith("text_model.") or key.startswith("text_projection."):

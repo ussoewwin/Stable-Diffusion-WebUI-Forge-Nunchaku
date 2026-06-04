@@ -359,7 +359,7 @@ class Lumina2(BASE):
 
 
 class AnimaBase(BASE):
-    """Anima Base（dim=2048, 28 blocks）— ComfyUI comfy.ldm.anima.model と同型。"""
+    """Anima Base (dim=2048, 28 blocks) — same layout as ComfyUI comfy.ldm.anima.model."""
 
     huggingface_repo = "circlestone-labs/Anima"
 
@@ -414,7 +414,7 @@ class AnimaBase(BASE):
 
 
 class AnimaWai68(AnimaBase):
-    """Anima 68ch 入力（例: waiANIMA_pw3）。"""
+    """Anima with 68 input channels (e.g. waiANIMA_pw3)."""
 
     unet_config = {
         "image_model": "anima",
@@ -429,7 +429,7 @@ class AnimaWai68(AnimaBase):
 
 
 class Anima(BASE):
-    """Anima（dim=5120, 36 blocks）。"""
+    """Anima large variant (dim=5120, 36 blocks)."""
 
     huggingface_repo = "circlestone-labs/Anima"
 
@@ -485,9 +485,9 @@ class Anima(BASE):
 
 
 class ZImageBase(Lumina2):
-    """Z-Image Base（dim=1920 の小規模版）。ComfyUI-master の NextDiT と互換。"""
+    """Z-Image Base (dim=1920, smaller). Compatible with ComfyUI-master NextDiT."""
 
-    huggingface_repo = "Tongyi-MAI/Z-Image-Turbo"  # 同一パイプライン設定で NextDiT をロード
+    huggingface_repo = "Tongyi-MAI/Z-Image-Turbo"  # Load NextDiT via same pipeline config
 
     unet_config = {
         "image_model": "lumina2",
