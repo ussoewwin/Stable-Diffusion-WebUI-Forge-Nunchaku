@@ -328,15 +328,16 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             elif cls_name == "CosmosTransformer3DModel" and isinstance(
                 guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68)
             ):
-                from backend.nn.anima import Anima
-                from backend.nn.comfy_anima import native_anima_unet_config
+                from comfy.ldm.anima.model import Anima
+                from backend.nn.comfy_anima import remap_anima_state_dict
+                import comfy.ops
 
                 if isinstance(state_dict, dict):
-                    from backend.nn.comfy_anima import _remap_anima_state_dict
-
-                    state_dict = _remap_anima_state_dict(state_dict)
-                guess.unet_config = native_anima_unet_config(guess.unet_config)
-                model_loader = lambda c: Anima(**native_anima_unet_config(c))
+                    state_dict = remap_anima_state_dict(state_dict)
+                for _k in ("dim", "n_layers", "rope_axis_dim"):
+                    guess.unet_config.pop(_k, None)
+                guess.unet_config["operations"] = comfy.ops.manual_cast
+                model_loader = lambda c: Anima(**c)
 
             unet_config = guess.unet_config.copy()
             
@@ -715,14 +716,10 @@ def split_state_dict(sd, additional_state_dicts: list = None):
     anima_cfg = detect_unet_config(sd, prefix)
     if anima_cfg.get("image_model") == "anima" and "in_channels" in anima_cfg:
         in_ch = int(anima_cfg["in_channels"])
-        dim = int(anima_cfg.get("dim", 2048))
-        from backend.nn.comfy_anima import infer_anima_unet_config_from_state_dict, native_anima_unet_config
-
-        full_cfg = infer_anima_unet_config_from_state_dict(sd, prefix)
-        anima_cfg.update(native_anima_unet_config(full_cfg))
-        if in_ch == 68 and dim == 2048:
+        model_channels = int(anima_cfg.get("model_channels", anima_cfg.get("dim", 2048)))
+        if in_ch == 68 and model_channels == 2048:
             guess = model_list.AnimaWai68(anima_cfg)
-        elif dim == 2048:
+        elif model_channels == 2048:
             guess = model_list.AnimaBase(anima_cfg)
         else:
             guess = model_list.Anima(anima_cfg)
@@ -760,14 +757,6 @@ def split_state_dict(sd, additional_state_dicts: list = None):
 
     for k, v in guess.clip_target.items():
         state_dict[v] = try_filter_state_dict(sd, [k + "."])
-
-    if "Anima" in getattr(guess, "huggingface_repo", ""):
-        unet_sd = state_dict.get(guess.unet_target)
-        te_sd = state_dict.get("text_encoder")
-        if isinstance(unet_sd, dict) and isinstance(te_sd, dict):
-            for k in list(unet_sd.keys()):
-                if k.startswith("llm_adapter"):
-                    te_sd[k] = unet_sd.pop(k)
 
     state_dict["ignore"] = sd
 

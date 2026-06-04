@@ -107,13 +107,14 @@ def compile_conditions(cond):
     cross_attn = cond["crossattn"]
     pooled_output = cond.get("vector")
 
+    model_conds = dict(c_crossattn=ConditionCrossAttn(cross_attn))
+    if pooled_output is not None:
+        model_conds["y"] = Condition(pooled_output)
+
     result = dict(
         cross_attn=cross_attn,
         pooled_output=pooled_output,
-        model_conds=dict(
-            c_crossattn=ConditionCrossAttn(cross_attn),
-            y=Condition(pooled_output) if pooled_output is not None else None,
-        ),
+        model_conds=model_conds,
     )
 
     if "guidance" in cond:

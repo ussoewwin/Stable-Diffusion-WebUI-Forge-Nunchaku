@@ -11,11 +11,11 @@ import comfy.ldm.lumina.model  # For NextDiT check in apply_model
 
 
 def _is_anima_diffusion_model(diffusion_model) -> bool:
-    """Forge native ``backend.nn.anima.Anima`` only."""
+    """ComfyUI ``comfy.ldm.anima.model.Anima`` (MiniTrainDIT + llm_adapter)."""
     try:
-        from backend.nn.anima import Anima as ForgeAnima
+        from comfy.ldm.anima.model import Anima as ComfyAnima
 
-        return isinstance(diffusion_model, ForgeAnima)
+        return isinstance(diffusion_model, ComfyAnima)
     except ImportError:
         return False
 

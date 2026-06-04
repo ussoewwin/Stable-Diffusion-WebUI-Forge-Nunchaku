@@ -46,21 +46,12 @@ def calculate_transformer_depth(prefix, state_dict_keys, state_dict):
 def detect_unet_config(state_dict: dict, key_prefix: str):
     state_dict_keys = list(state_dict.keys())
 
-    # Anima (MiniTrainDIT): x_embedder.proj.1 + llm_adapter (avoid misclassifying as Lumina2/Cosmos)
+    # Anima (MiniTrainDIT + llm_adapter): full config from ComfyUI model_detection
     _has_anima_llm = any(k.startswith("{}llm_adapter.".format(key_prefix)) for k in state_dict_keys)
     if "{}x_embedder.proj.1.weight".format(key_prefix) in state_dict_keys and _has_anima_llm:
-        w = state_dict["{}x_embedder.proj.1.weight".format(key_prefix)]
-        dit_config = {
-            "image_model": "anima",
-            "in_channels": int(w.shape[1]),
-            "dim": int(w.shape[0]),
-        }
-        if any(k.startswith("{}blocks.".format(key_prefix)) for k in state_dict_keys):
-            dit_config["n_layers"] = count_blocks(state_dict_keys, "{}blocks.".format(key_prefix) + "{}.")
-        kn_key = "{}blocks.0.attention.k_norm.weight".format(key_prefix)
-        if kn_key in state_dict_keys:
-            dit_config["rope_axis_dim"] = int(state_dict[kn_key].shape[1])
-        return dit_config
+        import comfy.model_detection as comfy_model_detection
+
+        return comfy_model_detection.detect_unet_config(state_dict, key_prefix)
 
     if (
         "{}cap_embedder.1.weight".format(key_prefix) in state_dict_keys
