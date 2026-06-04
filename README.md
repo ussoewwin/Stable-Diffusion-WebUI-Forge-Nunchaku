@@ -31,7 +31,7 @@ This program is a fork that integrates Nunchaku support into Stable Diffusion We
   - Load **Additional modules**: `qwen_3_06b_base.safetensors` (Qwen3 text encoder), `qwen_image_vae.safetensors` (VAE)
   - T5 tokenizer vocabulary for `llm_adapter` cross-attention (no separate T5/UMT5 weight file required)
 
-  <p align="center">
+  <p align="left">
     <img src="png/anima.png" alt="Anima UI preset and txt2img example" width="400">
   </p>
 
