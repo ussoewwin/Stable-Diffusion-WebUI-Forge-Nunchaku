@@ -365,7 +365,7 @@ class AnimaBase(BASE):
 
     unet_config = {
         "image_model": "anima",
-        "dim": 2048,
+        "model_channels": 2048,
     }
 
     sampling_settings = {
@@ -418,7 +418,7 @@ class AnimaWai68(AnimaBase):
 
     unet_config = {
         "image_model": "anima",
-        "dim": 2048,
+        "model_channels": 2048,
         "in_channels": 68,
     }
 
@@ -435,7 +435,7 @@ class Anima(BASE):
 
     unet_config = {
         "image_model": "anima",
-        "dim": 5120,
+        "model_channels": 5120,
     }
 
     unet_extra_config = {}

@@ -20,11 +20,6 @@ else:
 
 from . import qwen_vl
 
-try:
-    from backend.nn.anima import LLMAdapter
-except ImportError:
-    LLMAdapter = None  # type: ignore
-
 
 @dataclass
 class Qwen3_06BConfig:
@@ -442,15 +437,6 @@ class Qwen3_06B(BaseLlama, nn.Module):
         self.num_layers = config.num_hidden_layers
 
         self.model = Llama2_(config)
-
-        if LLMAdapter is None:
-            raise RuntimeError("backend.nn.anima.LLMAdapter is required for Anima (Qwen3_06B)")
-        self.llm_adapter = LLMAdapter()
-
-    def preprocess_text_embeds(self, text_embeds, text_ids):
-        if text_ids is not None:
-            return self.llm_adapter(text_embeds, text_ids)
-        return text_embeds
 
 
 class Qwen3_4B(BaseLlama, nn.Module):
