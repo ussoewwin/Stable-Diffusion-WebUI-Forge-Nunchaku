@@ -109,7 +109,7 @@ class KModel(torch.nn.Module):
         else:
             self.predictor = k_predictor
 
-        # ComfyUI標準のmodel_samplingを追加（ControlNet.pre_run()がmodel.model_samplingを期待するため）
+        # Add ComfyUI-style model_sampling (ControlNet.pre_run() expects model.model_sampling)
         if config is not None and hasattr(config, "model_type"):
             model_type = config.model_type
             if hasattr(model_type, "name"):

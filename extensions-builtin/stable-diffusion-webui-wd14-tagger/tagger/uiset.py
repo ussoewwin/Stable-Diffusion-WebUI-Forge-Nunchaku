@@ -14,11 +14,11 @@ from collections import defaultdict
 from PIL import Image
 
 from modules import shared  # pylint: disable=import-error
-# ForgeNeo compatibility: import re_special from deepbooru or create fallback
+# Forge Nunchaku compatibility: import re_special from deepbooru or create fallback
 try:
     from modules.deepbooru import re_special  # pylint: disable=import-error
 except ImportError:
-    # Fallback for ForgeNeo compatibility - this is the actual regex from A1111 deepbooru
+    # Fallback for Forge Nunchaku compatibility - this is the actual regex from A1111 deepbooru
     import re
     re_special = re.compile(r'([\\()])')
 from tagger import format as tags_format  # pylint: disable=import-error

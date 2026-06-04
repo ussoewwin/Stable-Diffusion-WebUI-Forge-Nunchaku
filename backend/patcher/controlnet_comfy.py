@@ -239,7 +239,7 @@ class ControlNet(ControlBase):
             if self.vae is not None:
                 compression_ratio *= self.vae.spacial_compression_encode()
             else:
-                # latent_input=Trueの場合、VAEは不要（cond_hint_originalは既にlatent形式）
+                # When latent_input=True, VAE is not needed (cond_hint_original is already latent)
                 if self.latent_format is not None and not (hasattr(self.control_model, 'latent_input') and self.control_model.latent_input):
                     raise ValueError("This Controlnet needs a VAE but none was provided, please use a ControlNetApply node with a VAE input and connect it.")
             self.cond_hint = comfy.utils.common_upscale(self.cond_hint_original, x_noisy.shape[-1] * compression_ratio, x_noisy.shape[-2] * compression_ratio, self.upscale_algorithm, "center")
@@ -286,8 +286,8 @@ class ControlNet(ControlBase):
         return c
 
     def get_models(self):
-        # ForgeNeoのメモリ管理システムがComfyUIのModelPatcherを処理しないように、空のリストを返す
-        # ComfyUI標準のControlNetシステムは、ModelPatcherを直接管理しない
+        # Return empty list so Forge Nunchaku memory management does not treat ComfyUI ModelPatcher
+        # ComfyUI ControlNet does not manage ModelPatcher directly
         return []
 
     def pre_run(self, model, percent_to_timestep_function):

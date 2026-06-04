@@ -1,7 +1,7 @@
 """Purpose: Pydantic models for the API."""
 from typing import List, Dict
 
-# ForgeNeo compatibility: InterrogateRequest doesn't exist, use BaseModel directly
+# Forge Nunchaku compatibility: InterrogateRequest doesn't exist, use BaseModel directly
 from pydantic import BaseModel, Field
 
 

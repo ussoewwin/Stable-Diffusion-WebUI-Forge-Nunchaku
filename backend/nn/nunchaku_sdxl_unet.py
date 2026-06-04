@@ -2251,7 +2251,7 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
         timesteps = timesteps.to(device=device, dtype=unet_dtype) if timesteps.dtype.is_floating_point else timesteps.to(device=device)
 
         # Build added_cond_kwargs for SDXL
-        # Forge Neo format for y (vector):
+        # Forge Nunchaku format for y (vector):
         #   - First part: clip_pooled (can be 1280 for CLIP-G only, or 2048 for CLIP-L+G)
         #   - Second part: flat time embedding (6 * 256 = 1536 dims from Timestep embedder)
         # Diffusers SDXL format:
@@ -2292,7 +2292,7 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
             added_cond_kwargs["time_ids"] = time_ids
 
         # ControlNet support
-        # Forge Neo format (from control_merge in controlnet.py):
+        # Forge Nunchaku format (from control_merge in controlnet.py):
         #   - control["output"]: down block residuals (all but last from ControlNet output)
         #   - control["middle"]: mid block residual (last from ControlNet output)
         # Diffusers format:
@@ -2339,7 +2339,7 @@ class SVDQUNet2DConditionModel(NunchakuModelMixin):
 
         if control is not None and isinstance(control, dict):
             # ControlNet signal conversion (fixed based on ComfyUI-nunchaku-unofficial-loader v2.6)
-            # Forge Neo format (from control_merge in controlnet.py):
+            # Forge Nunchaku format (from control_merge in controlnet.py):
             #   - control["output"]: down block residuals (all but last from ControlNet output)
             #   - control["middle"]: mid block residual (last from ControlNet output)
             #   - control["input"]: sometimes populated by adapters / edge cases

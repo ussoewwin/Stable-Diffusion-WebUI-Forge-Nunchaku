@@ -11,7 +11,7 @@ from backend.text_processing.anima_engine import AnimaTextProcessingEngine
 
 
 class Anima(ForgeDiffusionEngine):
-    """sd-webui-forge-classic 完成形と同じ: native UNet + AnimaTextProcessingEngine + Wan VAE."""
+    """Native Forge Anima engine: native UNet + AnimaTextProcessingEngine + Qwen Image VAE (is_wan)."""
 
     matched_guesses = [model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68]
 

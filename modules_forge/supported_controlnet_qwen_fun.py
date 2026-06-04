@@ -190,7 +190,7 @@ class QwenFunControlNetPatcher(ControlModelPatcher):
 
 
 def _is_qwen_image_unet(unet) -> bool:
-    """力ずくで適用: パスに依存せず diffusion_model の型で判定。Nunchaku/Std/comfy_ldm の Qwen Image をすべて受け入れる。"""
+    """Force-apply: detect by diffusion_model type, not path. Accepts Nunchaku/Std/comfy_ldm Qwen Image."""
     diffusion_model = getattr(getattr(unet, "model", None), "diffusion_model", None)
     if diffusion_model is None:
         return False

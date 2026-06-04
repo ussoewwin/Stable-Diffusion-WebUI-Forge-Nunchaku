@@ -10,7 +10,7 @@
 
 ## About
 
-This program is a fork that integrates Nunchaku support into Stable Diffusion WebUI Forge, including LoRA and ControlNet support for Nunchaku models.
+**Stable Diffusion WebUI Forge — Nunchaku** integrates Nunchaku into Forge, including LoRA and ControlNet support for Nunchaku models.
 
 ## Features
 
