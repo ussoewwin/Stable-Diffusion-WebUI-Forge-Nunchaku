@@ -7,6 +7,7 @@ from gradio.context import Context
 from backend import memory_management, operations, stream
 from backend.args import dynamic_args
 from modules import infotext_utils, paths, processing, sd_models, shared, shared_items, ui_common
+from modules_forge.presets import SAMPLERS, SCHEDULERS, PresetArch
 
 total_vram = int(memory_management.total_vram)
 
@@ -316,6 +317,32 @@ def forge_main_entry():
     refresh_model_loading_parameters()
 
 
+def _preset_sampler_scheduler_defaults(preset: str) -> tuple[str, str]:
+    try:
+        arch = PresetArch[preset]
+        return SAMPLERS[arch], SCHEDULERS[arch]
+    except KeyError:
+        return "Euler a", "Automatic"
+
+
+def _resolve_preset_sampler(preset: str, mode: str) -> str:
+    default, _ = _preset_sampler_scheduler_defaults(preset)
+    value = getattr(shared.opts, f"{preset}_{mode}_sampler", default)
+    if not value:
+        return default
+    names = {x.name for x in shared_items.list_samplers()}
+    return value if value in names else default
+
+
+def _resolve_preset_scheduler(preset: str, mode: str) -> str:
+    _, default = _preset_sampler_scheduler_defaults(preset)
+    value = getattr(shared.opts, f"{preset}_{mode}_scheduler", default)
+    if not value:
+        return default
+    names = set(shared_items.list_schedulers())
+    return value if value in names else default
+
+
 def on_preset_change(preset: str):
     assert preset is not None
     shared.opts.set("forge_preset", preset)
@@ -350,10 +377,10 @@ def on_preset_change(preset: str):
         gr.update(value=getattr(shared.opts, f"{preset}_i2i_cfg", 1.0)),  # ui_img2img_cfg
         gr.update(visible=distilled, label=d_label, value=getattr(shared.opts, f"{preset}_t2i_d_cfg", 3.0)),  # ui_txt2img_distilled_cfg
         gr.update(visible=distilled, label=d_label, value=getattr(shared.opts, f"{preset}_i2i_d_cfg", 3.0)),  # ui_img2img_distilled_cfg
-        gr.update(value=getattr(shared.opts, f"{preset}_t2i_sampler", "Euler")),  # ui_txt2img_sampler
-        gr.update(value=getattr(shared.opts, f"{preset}_i2i_sampler", "Euler")),  # ui_img2img_sampler
-        gr.update(value=getattr(shared.opts, f"{preset}_t2i_scheduler", "Simple")),  # ui_txt2img_scheduler
-        gr.update(value=getattr(shared.opts, f"{preset}_i2i_scheduler", "Simple")),  # ui_img2img_scheduler
+        gr.update(value=_resolve_preset_sampler(preset, "t2i")),  # ui_txt2img_sampler
+        gr.update(value=_resolve_preset_sampler(preset, "i2i")),  # ui_img2img_sampler
+        gr.update(value=_resolve_preset_scheduler(preset, "t2i")),  # ui_txt2img_scheduler
+        gr.update(value=_resolve_preset_scheduler(preset, "i2i")),  # ui_img2img_scheduler
         gr.update(value=getattr(shared.opts, f"{preset}_t2i_hr_cfg", 1.0)),  # ui_txt2img_hr_cfg
         gr.update(visible=distilled, label=d_label, value=getattr(shared.opts, f"{preset}_t2i_hr_d_cfg", 3.0)),  # ui_txt2img_hr_distilled_cfg
         gr.update(**batch_args),  # ui_txt2img_batch_size
