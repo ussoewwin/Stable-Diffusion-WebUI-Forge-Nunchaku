@@ -148,7 +148,7 @@
 
 ## 更新日志
 
-完整更新日志，请参阅 [CHANGELOG.md](../Changelog/CHANGELOG.md)。
+完整更新日志，请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 基础仓库
 
