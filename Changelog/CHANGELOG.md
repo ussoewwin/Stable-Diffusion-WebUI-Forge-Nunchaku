@@ -14,7 +14,7 @@
   - Text path: **`comfy.text_encoders.anima.AnimaTokenizer`** + Forge **`Qwen3_06B`** (embeddings only); **`preprocess_text_embeds`** runs once on the Comfy UNet in `get_learned_conditioning` (no TE-side `llm_adapter`).
   - Loader/detection: **`remap_anima_state_dict`** for key-name fixes only; **`comfy.model_detection.detect_unet_config`** delegate; **`k_model`** 4D↔5D wrap for still-image latents; **`compile_conditions`** omits pooled `y` when absent.
   - UI preset and Additional modules (`qwen_3_06b_base`, `qwen_image_vae`) unchanged from v1.7.0.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.1) ([中文](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/blob/main/zhmd/v1.7.1.md)) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.1) for details.
 
 ## Version 1.7.0
 
@@ -22,7 +22,7 @@
   - Native Forge support for [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) and compatible single-file checkpoints (e.g. `anima-base-v1.0.safetensors`, community merges such as `waiANIMA_pw3.safetensors`).
   - New **UI Preset: Anima** in the checkpoint manager; load **Additional modules** `qwen_3_06b_base.safetensors` (Qwen3 text encoder) and `qwen_image_vae.safetensors` (VAE). T5 tokenizer vocabulary is used for `llm_adapter` cross-attention without a separate T5/UMT5 weight file.
   - Native `backend.nn.anima` UNet with flow-matching sampling; **Shift** in the UI applies to the noise schedule.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0) ([中文](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/blob/main/zhmd/v1.7.0.md)) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0) for details.
 
 ## Version 1.6.1
 
