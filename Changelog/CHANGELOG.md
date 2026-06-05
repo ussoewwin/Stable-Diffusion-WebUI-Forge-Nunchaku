@@ -22,7 +22,7 @@
   - Native Forge support for [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) and compatible single-file checkpoints (e.g. `anima-base-v1.0.safetensors`, community merges such as `waiANIMA_pw3.safetensors`).
   - New **UI Preset: Anima** in the checkpoint manager; load **Additional modules** `qwen_3_06b_base.safetensors` (Qwen3 text encoder) and `qwen_image_vae.safetensors` (VAE). T5 tokenizer vocabulary is used for `llm_adapter` cross-attention without a separate T5/UMT5 weight file.
   - Native `backend.nn.anima` UNet with flow-matching sampling; **Shift** in the UI applies to the noise schedule.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0) ([中文](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/blob/main/zhmd/v1.7.0.md)) for details.
 
 ## Version 1.6.1
 

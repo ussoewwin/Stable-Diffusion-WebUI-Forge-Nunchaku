@@ -22,7 +22,7 @@
   - 对 [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) 及兼容单文件 checkpoint（例如 `anima-base-v1.0.safetensors`、社区合并模型如 `waiANIMA_pw3.safetensors`）的 Native Forge 支持。
   - checkpoint 管理器中新增 **UI Preset: Anima**；加载 **Additional modules** `qwen_3_06b_base.safetensors`（Qwen3 文本编码器）和 `qwen_image_vae.safetensors`（VAE）。T5 tokenizer 词汇表用于 `llm_adapter` cross-attention，无需单独的 T5/UMT5 权重文件。
   - Native `backend.nn.anima` UNet 与 flow-matching 采样；UI 中的 **Shift** 应用于噪声 schedule。
-  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0)。
+  - 详情请参阅 [Release Notes（中文）](v1.7.0.md)。
 
 ## Version 1.6.1
 
