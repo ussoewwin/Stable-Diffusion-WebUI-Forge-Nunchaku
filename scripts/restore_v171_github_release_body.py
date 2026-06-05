@@ -4,7 +4,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ORIGINAL = ROOT / "RELEASE_NOTES" / "_v1.7.1_original_body.md"
+FULL_EN = ROOT / "RELEASE_NOTES" / "v1.7.1.md"
 OUT = ROOT / "RELEASE_NOTES" / "v1.7.1_github_body.md"
 
 SWITCHER = """<table align="center">
@@ -18,7 +18,11 @@ SWITCHER = """<table align="center">
 
 
 def main() -> None:
-    original = ORIGINAL.read_text(encoding="utf-8")
+    full = FULL_EN.read_text(encoding="utf-8")
+    idx = full.find("## Table of contents")
+    if idx == -1:
+        raise SystemExit(f"Missing Table of contents in {FULL_EN}")
+    original = full[idx:]
     body = SWITCHER + original
     if len(body) > 125_000:
         raise SystemExit(f"Body too long for GitHub: {len(body)} chars (max 125000)")
