@@ -405,14 +405,43 @@ class AnimaBase(BASE):
     def model_type(self, state_dict):
         return ModelType.FLOW
 
+    def process_clip_state_dict(self, state_dict):
+        pref = self.text_encoder_key_prefix[0]
+        if any(k.startswith(pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {pref: ""}, filter_keys=True)
+        # Comfy ``supported_models.Anima`` default: ``cond_stage_model.*`` (``supported_models_base.BASE``)
+        comfy_pref = "cond_stage_model."
+        if any(k.startswith(comfy_pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {comfy_pref: ""}, filter_keys=True)
+        if any(k.startswith("qwen3_06b.") for k in state_dict):
+            return state_dict
+        return super().process_clip_state_dict(state_dict)
+
+    @classmethod
+    def anima_te_filter_prefixes(cls, clip_key: str) -> list[str]:
+        pref = cls.text_encoder_key_prefix[0]
+        return [
+            clip_key + ".",
+            pref + clip_key + ".",
+            "cond_stage_model." + clip_key + ".",
+        ]
+
     def clip_target(self, state_dict: dict):
         pref = self.text_encoder_key_prefix[0]
-        targets = {}
-        if "{}qwen3_06b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
-            targets["qwen3_06b.transformer"] = "text_encoder"
-        elif any(k.startswith("{}qwen3_06b.".format(pref)) for k in state_dict):
-            targets["qwen3_06b"] = "text_encoder"
-        return targets
+        comfy_pref = "cond_stage_model."
+        embed = "model.embed_tokens.weight"
+        checks = (
+            (f"{pref}qwen3_06b.transformer", "qwen3_06b.transformer"),
+            (f"{pref}qwen3_06b", "qwen3_06b"),
+            (f"{comfy_pref}qwen3_06b.transformer", "cond_stage_model.qwen3_06b.transformer"),
+            (f"{comfy_pref}qwen3_06b", "cond_stage_model.qwen3_06b"),
+            ("qwen3_06b.transformer", "qwen3_06b.transformer"),
+            ("qwen3_06b", "qwen3_06b"),
+        )
+        for prefix, target in checks:
+            if f"{prefix}.{embed}" in state_dict or any(k.startswith(f"{prefix}.") for k in state_dict):
+                return {target: "text_encoder"}
+        return {}
 
 
 class AnimaWai68(AnimaBase):
@@ -430,7 +459,7 @@ class AnimaWai68(AnimaBase):
     }
 
 
-class Anima(BASE):
+class Anima(AnimaBase):
     """Anima large variant (dim=5120, 36 blocks)."""
 
     huggingface_repo = "circlestone-labs/Anima"
@@ -440,29 +469,13 @@ class Anima(BASE):
         "model_channels": 5120,
     }
 
-    unet_extra_config = {}
-    required_keys = {}
-
-    unet_key_prefix = ["model.diffusion_model."]
-    vae_key_prefix = ["vae."]
-    text_encoder_key_prefix = ["text_encoders."]
-
-    unet_target = "transformer"
-
     memory_usage_factor = 2.0
-
-    sampling_settings = {
-        "multiplier": 1.0,
-        "shift": 3.0,
-    }
-
-    latent_format = latent.Wan21
-
-    supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
 
     @classmethod
     def matches(cls, unet_config, state_dict=None):
         if unet_config.get("image_model") != "anima":
+            return False
+        if int(unet_config.get("model_channels", unet_config.get("dim", 0))) != 5120:
             return False
         if state_dict is not None:
             keys = list(state_dict.keys())
@@ -472,18 +485,6 @@ class Anima(BASE):
             ):
                 return False
         return True
-
-    def model_type(self, state_dict):
-        return ModelType.FLOW
-
-    def clip_target(self, state_dict: dict):
-        pref = self.text_encoder_key_prefix[0]
-        targets = {}
-        if "{}qwen3_06b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
-            targets["qwen3_06b.transformer"] = "text_encoder"
-        elif any(k.startswith("{}qwen3_06b.".format(pref)) for k in state_dict):
-            targets["qwen3_06b"] = "text_encoder"
-        return targets
 
 
 class ZImageBase(Lumina2):
