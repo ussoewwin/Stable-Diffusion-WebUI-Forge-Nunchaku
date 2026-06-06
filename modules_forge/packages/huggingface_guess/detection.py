@@ -60,69 +60,9 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
             or "{}noise_refiner.0.attention.norm_k.weight".format(key_prefix) in state_dict_keys
         )
     ):  # Lumina 2: requires noise_refiner (distinguishes from cap-only Anima ckpts like wai)
-        dit_config = {}
-        dit_config["image_model"] = "lumina2"
-        dit_config["patch_size"] = 2
-        dit_config["in_channels"] = 16
-        w = state_dict["{}cap_embedder.1.weight".format(key_prefix)]
-        dit_config["dim"] = int(w.shape[0])
-        dit_config["cap_feat_dim"] = int(w.shape[1])
-        dit_config["n_layers"] = count_blocks(state_dict_keys, "{}layers.".format(key_prefix) + "{}.")
-        dit_config["qk_norm"] = True
+        from .lumina_detection_merge import detect_lumina_comfy_with_forge_merge
 
-        if dit_config["dim"] == 2304:  # Lumina 2
-            dit_config["n_heads"] = 24
-            dit_config["n_kv_heads"] = 8
-            dit_config["axes_dims"] = [32, 32, 32]
-            dit_config["axes_lens"] = [300, 512, 512]
-            dit_config["rope_theta"] = 10000.0
-            dit_config["ffn_dim_multiplier"] = 4.0
-        elif dit_config["dim"] == 3840:  # Z-Image
-            dit_config["nunchaku"] = "{}layers.0.attention.to_out.0.qweight".format(key_prefix) in state_dict_keys
-            dit_config["n_heads"] = 30
-            dit_config["n_kv_heads"] = 30
-            dit_config["axes_dims"] = [32, 48, 48]
-            dit_config["axes_lens"] = [1536, 512, 512]
-            dit_config["rope_theta"] = 256.0
-            dit_config["ffn_dim_multiplier"] = 8.0 / 3.0
-            dit_config["z_image_modulation"] = True
-            dit_config["time_scale"] = 1000.0
-            if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
-                dit_config["pad_tokens_multiple"] = 32
-            # Z-Image distilled: main-layer FFN uses 1920-dim input (attention stays 3840)
-            ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
-            ff_w2_key = "{}layers.0.feed_forward.w2.weight".format(key_prefix)
-            if ff_w1_key in state_dict_keys and ff_w2_key in state_dict_keys:
-                ff_w1 = state_dict[ff_w1_key]
-                ff_w2 = state_dict[ff_w2_key]
-                if ff_w1.shape[1] == 1920 and ff_w2.shape[0] == 3840:
-                    dit_config["ffn_input_dim"] = 1920
-                    # Gate output dim matches w2.in_features (5120)
-                    dit_config["ffn_dim_multiplier"] = float(ff_w2.shape[1]) / 1920.0
-        elif dit_config["dim"] == 1920:  # Z-Image Base (smaller variant)
-            dit_config["nunchaku"] = "{}layers.0.attention.to_out.0.qweight".format(key_prefix) in state_dict_keys
-            dit_config["n_heads"] = 30
-            dit_config["n_kv_heads"] = 30
-            dit_config["axes_dims"] = [16, 24, 24]  # sum = 64 = dim // n_heads
-            dit_config["axes_lens"] = [1536, 512, 512]
-            dit_config["rope_theta"] = 256.0
-            dit_config["z_image_modulation"] = True
-            dit_config["time_scale"] = 1000.0
-            if "{}cap_pad_token".format(key_prefix) in state_dict_keys:
-                dit_config["pad_tokens_multiple"] = 32
-            # ffn_dim_multiplier is inferred from state_dict below
-
-        # Lumina2/Z-Image: infer ffn_dim_multiplier from feed_forward.w1 (Z-Image Base variants, etc.)
-        ff_w1_key = "{}layers.0.feed_forward.w1.weight".format(key_prefix)
-        if ff_w1_key in state_dict_keys:
-            ff_w1 = state_dict[ff_w1_key]
-            # w1: (out_features=hidden_dim, in_features=dim)
-            ff_hidden = int(ff_w1.shape[0])
-            dim_actual = int(ff_w1.shape[1])
-            if dim_actual == dit_config["dim"] and ff_hidden > 0:
-                dit_config["ffn_dim_multiplier"] = ff_hidden / float(dim_actual)
-
-        return dit_config
+        return detect_lumina_comfy_with_forge_merge(state_dict, key_prefix, state_dict_keys)
 
 
     if "{}single_transformer_blocks.0.mlp_fc1.qweight".format(key_prefix) in state_dict_keys:  # SVDQ
