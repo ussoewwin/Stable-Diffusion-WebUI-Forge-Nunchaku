@@ -7,6 +7,16 @@
   </tr>
 </table>
 
+## Version 1.7.3
+
+- **Anima: ComfyUI text encoder import (Step 5a)**
+  - Anima TE load and encode now use Comfy **`load_text_encoder_state_dicts`** and **`CLIP.encode_from_tokens`** instead of Forge duplicate **`Qwen3_06B`** and hand-written **`_encode_qwen`**.
+  - **`forge_objects.clip`** holds Comfy **`sd.CLIP`** (`AnimaTEModel` + `AnimaTokenizer`) directly; Forge **`CLIP`** wrapper and HF **`tokenizer`** / **`tokenizer_2`** wiring removed from the Anima diffusion engine.
+  - Removed Forge **`Qwen3_06BConfig`** / **`Qwen3_06B`** from **`llama.py`** (Anima only; **`Qwen3_4B`** unchanged for other models).
+  - **`split_state_dict`**: extract TE keys **before** **`process_clip_state_dict`**, using **`anima_te_filter_prefixes`** for HF **`text_encoders.*`**, Comfy **`cond_stage_model.*`**, and bare **`qwen3_06b.*`** checkpoint layouts.
+  - **`AnimaBase`**: expanded **`clip_target`** (six layout patterns) and **`process_clip_state_dict`**; large Anima **`class Anima(AnimaBase)`** inherits TE extraction fixes (previously **`Anima(BASE)`**).
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.3) for details.
+
 ## Version 1.7.2
 
 - **Nunchaku Z-Image Turbo: Lumina detection regression fix**
