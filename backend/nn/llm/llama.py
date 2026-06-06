@@ -1,4 +1,4 @@
-# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.75/comfy/text_encoders/llama.py
+# Qwen2.5-VL only (Lumina2 / Z-Image TE: Comfy ``comfy.text_encoders.llama`` via ``load_text_encoder_state_dicts``)
 
 import math
 from dataclasses import asdict, dataclass
@@ -22,29 +22,6 @@ from . import qwen_vl
 
 
 @dataclass
-class Qwen3_4BConfig:
-    vocab_size: int = 151936
-    hidden_size: int = 2560
-    intermediate_size: int = 9728
-    num_hidden_layers: int = 36
-    num_attention_heads: int = 32
-    num_key_value_heads: int = 8
-    max_position_embeddings: int = 40960
-    rms_norm_eps: float = 1e-6
-    rope_theta: float = 1000000.0
-    transformer_type: str = "llama"
-    head_dim = 128
-    rms_norm_add = False
-    mlp_activation = "silu"
-    qkv_bias = False
-    rope_dims = None
-    q_norm = "gemma3"
-    k_norm = "gemma3"
-    rope_scale = None
-    final_norm: bool = True
-
-
-@dataclass
 class Qwen25_7BVLI_Config:
     vocab_size: int = 152064
     hidden_size: int = 3584
@@ -63,30 +40,6 @@ class Qwen25_7BVLI_Config:
     rope_dims = [16, 24, 24]
     q_norm = None
     k_norm = None
-    rope_scale = None
-    final_norm: bool = True
-
-
-@dataclass
-class Gemma2_2B_Config:
-    vocab_size: int = 256000
-    hidden_size: int = 2304
-    intermediate_size: int = 9216
-    num_hidden_layers: int = 26
-    num_attention_heads: int = 8
-    num_key_value_heads: int = 4
-    max_position_embeddings: int = 8192
-    rms_norm_eps: float = 1e-6
-    rope_theta: float = 10000.0
-    transformer_type: str = "gemma2"
-    head_dim = 256
-    rms_norm_add = True
-    mlp_activation = "gelu_pytorch_tanh"
-    qkv_bias = False
-    rope_dims = None
-    q_norm = None
-    k_norm = None
-    sliding_attention = None
     rope_scale = None
     final_norm: bool = True
 
@@ -144,7 +97,7 @@ def apply_rope(xq, xk, freqs_cis):
 
 
 class Attention(nn.Module):
-    def __init__(self, config: Qwen3_4BConfig | Qwen25_7BVLI_Config | Gemma2_2B_Config):
+    def __init__(self, config: Qwen25_7BVLI_Config):
         super().__init__()
         self.num_heads = config.num_attention_heads
         self.num_kv_heads = config.num_key_value_heads
@@ -199,7 +152,7 @@ class Attention(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, config: Qwen3_4BConfig | Qwen25_7BVLI_Config | Gemma2_2B_Config):
+    def __init__(self, config: Qwen25_7BVLI_Config):
         super().__init__()
         self.gate_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=False)
         self.up_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=False)
@@ -214,7 +167,7 @@ class MLP(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, config: Qwen3_4BConfig | Qwen25_7BVLI_Config | Gemma2_2B_Config, index):
+    def __init__(self, config: Qwen25_7BVLI_Config, index):
         super().__init__()
         self.self_attn = Attention(config)
         self.mlp = MLP(config)
@@ -248,75 +201,16 @@ class TransformerBlock(nn.Module):
         return x
 
 
-class TransformerBlockGemma2(nn.Module):
-    def __init__(self, config: Qwen3_4BConfig | Qwen25_7BVLI_Config | Gemma2_2B_Config, index):
-        super().__init__()
-        self.self_attn = Attention(config)
-        self.mlp = MLP(config)
-        self.input_layernorm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=config.rms_norm_add)
-        self.post_attention_layernorm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=config.rms_norm_add)
-        self.pre_feedforward_layernorm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=config.rms_norm_add)
-        self.post_feedforward_layernorm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=config.rms_norm_add)
-
-        if config.sliding_attention is not None:
-            self.sliding_attention = config.sliding_attention[index % len(config.sliding_attention)]
-        else:
-            self.sliding_attention = False
-
-        self.transformer_type = config.transformer_type
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        freqs_cis: Optional[torch.Tensor] = None,
-        optimized_attention=None,
-    ):
-        if self.transformer_type == "gemma3":
-            if self.sliding_attention:
-                assert x.shape[1] <= self.sliding_attention
-                freqs_cis = freqs_cis[1]
-            else:
-                freqs_cis = freqs_cis[0]
-
-        # Self Attention
-        residual = x
-        x = self.input_layernorm(x)
-        x = self.self_attn(
-            hidden_states=x,
-            attention_mask=attention_mask,
-            freqs_cis=freqs_cis,
-            optimized_attention=optimized_attention,
-        )
-
-        x = self.post_attention_layernorm(x)
-        x = residual + x
-
-        # MLP
-        residual = x
-        x = self.pre_feedforward_layernorm(x)
-        x = self.mlp(x)
-        x = self.post_feedforward_layernorm(x)
-        x = residual + x
-
-        return x
-
-
 class Llama2_(nn.Module):
-    def __init__(self, config: Qwen3_4BConfig | Qwen25_7BVLI_Config | Gemma2_2B_Config):
+    def __init__(self, config: Qwen25_7BVLI_Config):
         super().__init__()
         self.config = config
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        if self.config.transformer_type == "gemma2" or self.config.transformer_type == "gemma3":
-            transformer = TransformerBlockGemma2
-            self.normalize_in = True
-        else:
-            transformer = TransformerBlock
-            self.normalize_in = False
+        self.normalize_in = False
 
-        self.layers = nn.ModuleList([transformer(config, index=i) for i in range(config.num_hidden_layers)])
+        self.layers = nn.ModuleList([TransformerBlock(config, index=i) for i in range(config.num_hidden_layers)])
 
         if config.final_norm:
             self.norm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=config.rms_norm_add)
@@ -401,21 +295,6 @@ class BaseLlama:
         return self.model(input_ids, *args, **kwargs)
 
 
-class Qwen3_4B(BaseLlama, nn.Module):
-    def __init__(self, config_dict):
-        super().__init__()
-        config = Qwen3_4BConfig()
-
-        _config_dict = asdict(config)
-        for key, value in _config_dict.items():
-            if key in config_dict:
-                assert value == config_dict[key]
-
-        self.num_layers = config.num_hidden_layers
-
-        self.model = Llama2_(config)
-
-
 class Qwen25_7BVLI(BaseLlama, nn.Module):
     def __init__(self, config_dict):
         super().__init__()
@@ -463,18 +342,3 @@ class Qwen25_7BVLI(BaseLlama, nn.Module):
             position_ids = None
 
         return super().forward(x, attention_mask=attention_mask, embeds=embeds, num_tokens=num_tokens, intermediate_output=intermediate_output, final_layer_norm_intermediate=final_layer_norm_intermediate, dtype=dtype, position_ids=position_ids)
-
-
-class Gemma2_2B(BaseLlama, nn.Module):
-    def __init__(self, config_dict):
-        super().__init__()
-        config = Gemma2_2B_Config()
-
-        _config_dict = asdict(config)
-        for key, value in _config_dict.items():
-            if key in config_dict:
-                assert value == config_dict[key]
-
-        self.num_layers = config.num_hidden_layers
-
-        self.model = Llama2_(config)
