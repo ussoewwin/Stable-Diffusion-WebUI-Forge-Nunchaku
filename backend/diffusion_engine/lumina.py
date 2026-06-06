@@ -1,23 +1,24 @@
 import torch
 from huggingface_guess import model_list
 
-from backend import memory_management
+from backend.comfy_te_glue import offload_comfy_clip
 from backend.diffusion_engine.base import ForgeDiffusionEngine, ForgeObjects
 from backend.modules.k_prediction import PredictionDiscreteFlow
-from backend.patcher.clip import CLIP
 from backend.patcher.unet import UnetPatcher
 from backend.patcher.vae import VAE
 from backend.text_processing.gemma_engine import GemmaTextProcessingEngine
 
 
 class Lumina2(ForgeDiffusionEngine):
+    """Forge glue only: Comfy ``NextDiT`` UNet + Comfy ``sd.CLIP`` (Lumina2 TE)."""
+
     matched_guesses = [model_list.Lumina2]
 
     def __init__(self, estimated_config, huggingface_components):
         super().__init__(estimated_config, huggingface_components)
         self.is_inpaint = False
 
-        clip = CLIP(model_dict={"gemma2": huggingface_components["text_encoder"]}, tokenizer_dict={"gemma2": huggingface_components["tokenizer"]})
+        clip = huggingface_components["text_encoder"]
 
         vae = VAE(model=huggingface_components["vae"])
 
@@ -25,10 +26,7 @@ class Lumina2(ForgeDiffusionEngine):
 
         unet = UnetPatcher.from_model(model=huggingface_components["transformer"], diffusers_scheduler=None, k_predictor=k_predictor, config=estimated_config)
 
-        self.text_processing_engine_gemma = GemmaTextProcessingEngine(
-            text_encoder=clip.cond_stage_model.gemma2,
-            tokenizer=clip.tokenizer.gemma2,
-        )
+        self.text_processing_engine_gemma = GemmaTextProcessingEngine(clip)
 
         self.forge_objects = ForgeObjects(unet=unet, clip=clip, vae=vae, clipvision=None)
         self.forge_objects_original = self.forge_objects.shallow_copy()
@@ -39,10 +37,11 @@ class Lumina2(ForgeDiffusionEngine):
 
     @torch.inference_mode()
     def get_learned_conditioning(self, prompt: list[str]):
-        memory_management.load_model_gpu(self.forge_objects.clip.patcher)
         shift = getattr(prompt, "distilled_cfg_scale", 6.0)
         self.forge_objects.unet.model.predictor.set_parameters(shift=shift)
-        return self.text_processing_engine_gemma(prompt)
+        cond = self.text_processing_engine_gemma(prompt)
+        offload_comfy_clip(self.forge_objects.clip)
+        return cond
 
     @torch.inference_mode()
     def get_prompt_lengths_on_ui(self, prompt):

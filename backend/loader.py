@@ -9,6 +9,7 @@ from transformers import modeling_utils
 
 import backend.args
 from backend import memory_management
+from backend.comfy_te_glue import comfy_te_model_options, is_comfy_sd_clip
 from backend.diffusion_engine.chroma import Chroma
 from backend.diffusion_engine.flux import Flux
 from backend.diffusion_engine.anima import Anima
@@ -36,6 +37,70 @@ possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL,
 logging.getLogger("diffusers").setLevel(logging.ERROR)
 dir_path = os.path.dirname(__file__)
 
+_ANIMA_GUESS_NAMES = frozenset({"Anima", "AnimaBase", "AnimaWai68"})
+
+
+def _is_anima_guess(guess) -> bool:
+    """Anima guess comes from ``modules_forge`` model_list; do not use cross-module isinstance."""
+    return type(guess).__name__ in _ANIMA_GUESS_NAMES
+
+
+def _matches_guess_config(estimated_config, matched_guesses) -> bool:
+    """Match engine to guess config.
+
+    ``huggingface_guess.guess()`` returns instances of ``huggingface_guess.model_list.*``.
+    Diffusion engines may import the same classes via ``huggingface_guess`` or
+    ``modules_forge.packages.huggingface_guess`` (different module objects, same source file).
+    ``type(x) is y`` fails across those imports; compare class names as well.
+    """
+    cfg_type = type(estimated_config)
+    cfg_name = cfg_type.__name__
+    for guess_cls in matched_guesses:
+        if cfg_type is guess_cls or cfg_name == guess_cls.__name__:
+            return True
+    return False
+
+
+def _te_filter_prefixes(guess, clip_key: str) -> list[str]:
+    if hasattr(guess, "te_filter_prefixes"):
+        prefixes = list(guess.te_filter_prefixes(clip_key))
+    elif hasattr(guess, "anima_te_filter_prefixes"):
+        prefixes = list(guess.anima_te_filter_prefixes(clip_key))
+    else:
+        pref = guess.text_encoder_key_prefix[0]
+        prefixes = [clip_key + ".", pref + clip_key + "."]
+    root = clip_key.split(".")[0]
+    prefixes.extend([root + ".", "transformer."])
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in prefixes:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def _comfy_load_te(guess, state_dict, clip_key: str, layer_probe: str, spiece_from_guess: bool = False):
+    from comfy.sd import load_text_encoder_state_dicts
+
+    if not isinstance(state_dict, dict) or len(state_dict) <= 16:
+        return None
+
+    te_sd = dict(state_dict)
+    if layer_probe not in te_sd:
+        te_sd = guess.process_clip_state_dict(dict(te_sd))
+        for prefix in _te_filter_prefixes(guess, clip_key):
+            part = try_filter_state_dict(dict(te_sd), [prefix])
+            if part:
+                te_sd = part
+                break
+
+    if spiece_from_guess:
+        spiece = getattr(guess, "forge_spiece_model", None)
+        if spiece is not None:
+            te_sd["spiece_model"] = spiece
+
+    return load_text_encoder_state_dicts([te_sd], model_options=comfy_te_model_options())
 
 
 def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_path, state_dict):
@@ -140,91 +205,34 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
         if cls_name == "Gemma2Model":
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have Gemma2 state dict!"
 
-            from backend.nn.llm.llama import Gemma2_2B
-
-            config = read_arbitrary_config(config_path)
-
-            storage_dtype = memory_management.text_encoder_dtype()
-            state_dict_dtype = memory_management.state_dict_dtype(state_dict)
-
-            if state_dict_dtype in [torch.float8_e4m3fn, torch.float8_e5m2, "nf4", "fp4", "gguf"]:
-                print(f"Using Detected Gemma2 Data Type: {state_dict_dtype}")
-                storage_dtype = state_dict_dtype
-                if state_dict_dtype in ["nf4", "fp4", "gguf"]:
-                    print("Using pre-quant state dict!")
-                    if state_dict_dtype in ["gguf"]:
-                        beautiful_print_gguf_state_dict_statics(state_dict)
-            else:
-                print(f"Using Default Gemma2 Data Type: {storage_dtype}")
-
-            if storage_dtype in ["nf4", "fp4", "gguf"]:
-                with modeling_utils.no_init_weights():
-                    with using_forge_operations(device=memory_management.cpu, dtype=memory_management.text_encoder_dtype(), manual_cast_enabled=False, bnb_dtype=storage_dtype):
-                        model = Gemma2_2B(config)
-            else:
-                with modeling_utils.no_init_weights():
-                    with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
-                        model = Gemma2_2B(config)
-
-            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
-
-            model.forge_spiece_model = getattr(guess, "forge_spiece_model", None)
-
-            return model
+            return _comfy_load_te(
+                guess,
+                state_dict,
+                clip_key="gemma2_2b.transformer",
+                layer_probe="model.layers.0.post_feedforward_layernorm.weight",
+                spiece_from_guess=True,
+            )
         if cls_name == "Qwen3Model":
             if not isinstance(state_dict, dict) or len(state_dict) <= 16:
                 print(f"[Loader] Qwen3Model skipped: state_dict has {len(state_dict) if isinstance(state_dict, dict) else 0} keys. Wrong checkpoint? (SDXL may be misdetected as Qwen)")
                 return None
 
-            config = read_arbitrary_config(config_path)
-            _anima_te = isinstance(guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68))
+            _anima_te = _is_anima_guess(guess)
 
             if _anima_te:
-                from comfy.sd import load_text_encoder_state_dicts
+                return _comfy_load_te(
+                    guess,
+                    state_dict,
+                    clip_key="qwen3_06b.transformer",
+                    layer_probe="model.layers.0.post_attention_layernorm.weight",
+                )
 
-                te_sd = state_dict
-                if te_sd and "model.layers.0.post_attention_layernorm.weight" not in te_sd:
-                    te_sd = dict(te_sd)
-                    te_sd = guess.process_clip_state_dict(te_sd)
-                    for prefix in (
-                        "qwen3_06b.transformer.",
-                        "cond_stage_model.qwen3_06b.transformer.",
-                        "qwen3_06b.",
-                        "transformer.",
-                    ):
-                        part = try_filter_state_dict(dict(te_sd), [prefix])
-                        if part:
-                            te_sd = part
-                            break
-                return load_text_encoder_state_dicts([te_sd])
-
-            storage_dtype = memory_management.text_encoder_dtype()
-            state_dict_dtype = memory_management.state_dict_dtype(state_dict)
-
-            if state_dict_dtype in [torch.float8_e4m3fn, torch.float8_e5m2, "nf4", "fp4", "gguf"]:
-                print(f"Using Detected Qwen3 Data Type: {state_dict_dtype}")
-                storage_dtype = state_dict_dtype
-                if state_dict_dtype in ["nf4", "fp4", "gguf"]:
-                    print("Using pre-quant state dict!")
-                    if state_dict_dtype in ["gguf"]:
-                        beautiful_print_gguf_state_dict_statics(state_dict)
-            else:
-                print(f"Using Default Qwen3 Data Type: {storage_dtype}")
-
-            from backend.nn.llm.llama import Qwen3_4B as QTE
-
-            if storage_dtype in ["nf4", "fp4", "gguf"]:
-                with modeling_utils.no_init_weights():
-                    with using_forge_operations(device=memory_management.cpu, dtype=memory_management.text_encoder_dtype(), manual_cast_enabled=False, bnb_dtype=storage_dtype):
-                        model = QTE(config)
-            else:
-                with modeling_utils.no_init_weights():
-                    with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
-                        model = QTE(config)
-
-            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
-
-            return model
+            return _comfy_load_te(
+                guess,
+                state_dict,
+                clip_key="qwen3_4b.transformer",
+                layer_probe="model.layers.0.post_attention_layernorm.weight",
+            )
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have T5 state dict!"
 
@@ -771,8 +779,8 @@ def split_state_dict(sd, additional_state_dicts: list = None):
     state_dict = {guess.unet_target: try_filter_state_dict(sd, guess.unet_key_prefix), guess.vae_target: try_filter_state_dict(sd, guess.vae_key_prefix)}
 
     for k, v in guess.clip_target.items():
-        if hasattr(guess, "anima_te_filter_prefixes"):
-            prefixes = guess.anima_te_filter_prefixes(k)
+        if hasattr(guess, "te_filter_prefixes"):
+            prefixes = guess.te_filter_prefixes(k)
         else:
             prefixes = [k + ".", f"{guess.text_encoder_key_prefix[0]}{k}."]
         state_dict[v] = try_filter_state_dict(sd, prefixes)
@@ -811,9 +819,12 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
     local_path = os.path.join(dir_path, "huggingface", repo_name)
     config: dict = DiffusionPipeline.load_config(local_path)
     huggingface_components = {}
+    comfy_te_loaded = False
     for component_name, v in config.items():
         if isinstance(v, list) and len(v) == 2:
             lib_name, cls_name = v
+            if component_name == "tokenizer" and comfy_te_loaded:
+                continue
             component_sd = state_dicts.pop(component_name, None)
             
             if backend.args.dynamic_args["nunchaku"] and component_name in ["text_encoder", "text_encoder_2"]:
@@ -862,6 +873,8 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
                 del component_sd
             if component is not None:
                 huggingface_components[component_name] = component
+                if component_name == "text_encoder" and is_comfy_sd_clip(component):
+                    comfy_te_loaded = True
 
     del state_dicts
 
@@ -904,8 +917,8 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
             huggingface_components["scheduler"].config.prediction_type = prediction_types.get(estimated_config.model_type.name, huggingface_components["scheduler"].config.prediction_type)
 
     for M in possible_models:
-        if any(type(estimated_config) is x for x in M.matched_guesses):
+        if _matches_guess_config(estimated_config, M.matched_guesses):
             return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
 
-    print("Failed to recognize model type!")
+    print(f"Failed to recognize model type! (guess={type(estimated_config).__name__}, repo={getattr(estimated_config, 'huggingface_repo', None)})")
     return None

@@ -348,16 +348,67 @@ class Lumina2(BASE):
     def model_type(self, state_dict):
         return ModelType.FLOW
 
+    def process_clip_state_dict(self, state_dict):
+        pref = self.text_encoder_key_prefix[0]
+        if any(k.startswith(pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {pref: ""}, filter_keys=True)
+        comfy_pref = "cond_stage_model."
+        if any(k.startswith(comfy_pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {comfy_pref: ""}, filter_keys=True)
+        if any(k.startswith("gemma2_2b.") for k in state_dict):
+            return state_dict
+        if any(k.startswith("qwen3_4b.") for k in state_dict):
+            return state_dict
+        return super().process_clip_state_dict(state_dict)
+
+    @classmethod
+    def te_filter_prefixes(cls, clip_key: str) -> list[str]:
+        pref = cls.text_encoder_key_prefix[0]
+        return [
+            clip_key + ".",
+            pref + clip_key + ".",
+            "cond_stage_model." + clip_key + ".",
+        ]
+
+    @staticmethod
+    def _qwen3_4b_clip_target(state_dict: dict) -> dict:
+        pref = "text_encoders."
+        comfy_pref = "cond_stage_model."
+        embed = "model.embed_tokens.weight"
+        checks = (
+            (f"{pref}qwen3_4b.transformer", "qwen3_4b.transformer"),
+            (f"{pref}qwen3_4b", "qwen3_4b"),
+            (f"{comfy_pref}qwen3_4b.transformer", "cond_stage_model.qwen3_4b.transformer"),
+            (f"{comfy_pref}qwen3_4b", "cond_stage_model.qwen3_4b"),
+            ("qwen3_4b.transformer", "qwen3_4b.transformer"),
+            ("qwen3_4b", "qwen3_4b"),
+        )
+        for prefix, target in checks:
+            if f"{prefix}.{embed}" in state_dict or any(k.startswith(f"{prefix}.") for k in state_dict):
+                return {target: "text_encoder"}
+        return {"qwen3_4b.transformer": "text_encoder"}
+
     def clip_target(self, state_dict: dict):
         pref = self.text_encoder_key_prefix[0]
+        comfy_pref = "cond_stage_model."
         spiece_key = "{}spiece_model".format(pref)
         self.forge_spiece_model = state_dict.pop(spiece_key, None)
-        if "{}gemma2_2b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
-            state_dict.pop("{}gemma2_2b.logit_scale".format(pref), None)
-            state_dict.pop(spiece_key, None)
-            return {"gemma2_2b.transformer": "text_encoder"}
-        else:
-            return {"gemma2_2b": "text_encoder"}
+        embed = "model.embed_tokens.weight"
+        checks = (
+            (f"{pref}gemma2_2b.transformer", "gemma2_2b.transformer"),
+            (f"{pref}gemma2_2b", "gemma2_2b"),
+            (f"{comfy_pref}gemma2_2b.transformer", "cond_stage_model.gemma2_2b.transformer"),
+            (f"{comfy_pref}gemma2_2b", "cond_stage_model.gemma2_2b"),
+            ("gemma2_2b.transformer", "gemma2_2b.transformer"),
+            ("gemma2_2b", "gemma2_2b"),
+        )
+        for prefix, target in checks:
+            if f"{prefix}.{embed}" in state_dict or any(k.startswith(f"{prefix}.") for k in state_dict):
+                state_dict.pop("{}gemma2_2b.logit_scale".format(pref), None)
+                state_dict.pop("{}gemma2_2b.logit_scale".format(comfy_pref), None)
+                state_dict.pop(spiece_key, None)
+                return {target: "text_encoder"}
+        return {"gemma2_2b.transformer": "text_encoder"}
 
 
 class AnimaBase(BASE):
@@ -419,6 +470,10 @@ class AnimaBase(BASE):
 
     @classmethod
     def anima_te_filter_prefixes(cls, clip_key: str) -> list[str]:
+        return cls.te_filter_prefixes(clip_key)
+
+    @classmethod
+    def te_filter_prefixes(cls, clip_key: str) -> list[str]:
         pref = cls.text_encoder_key_prefix[0]
         return [
             clip_key + ".",
@@ -506,8 +561,8 @@ class ZImageBase(Lumina2):
 
     supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
 
-    def clip_target(self, state_dict={}):
-        return {"qwen3_4b.transformer": "text_encoder"}
+    def clip_target(self, state_dict: dict):
+        return Lumina2._qwen3_4b_clip_target(state_dict)
 
 
 class ZImage(Lumina2):
@@ -527,8 +582,8 @@ class ZImage(Lumina2):
 
     supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
 
-    def clip_target(self, state_dict={}):
-        return {"qwen3_4b.transformer": "text_encoder"}
+    def clip_target(self, state_dict: dict):
+        return Lumina2._qwen3_4b_clip_target(state_dict)
 
 
 class QwenImage(BASE):
