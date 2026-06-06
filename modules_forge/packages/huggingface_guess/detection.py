@@ -55,7 +55,10 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
 
     if (
         "{}cap_embedder.1.weight".format(key_prefix) in state_dict_keys
-        and "{}noise_refiner.0.attention.k_norm.weight".format(key_prefix) in state_dict_keys
+        and (
+            "{}noise_refiner.0.attention.k_norm.weight".format(key_prefix) in state_dict_keys
+            or "{}noise_refiner.0.attention.norm_k.weight".format(key_prefix) in state_dict_keys
+        )
     ):  # Lumina 2: requires noise_refiner (distinguishes from cap-only Anima ckpts like wai)
         dit_config = {}
         dit_config["image_model"] = "lumina2"
