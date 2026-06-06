@@ -7,6 +7,16 @@
   </tr>
 </table>
 
+## Version 1.7.3
+
+- **Anima：ComfyUI 文本编码器 import（Step 5a）**
+  - Anima TE 的加载与编码现使用 Comfy **`load_text_encoder_state_dicts`** 和 **`CLIP.encode_from_tokens`**，不再使用 Forge 复刻 **`Qwen3_06B`** 及手写 **`_encode_qwen`**。
+  - **`forge_objects.clip`** 直接持有 Comfy **`sd.CLIP`**（`AnimaTEModel` + `AnimaTokenizer`）；Anima diffusion engine 中已移除 Forge **`CLIP`** 包装器及 HF **`tokenizer`** / **`tokenizer_2`** 接线。
+  - 从 **`llama.py`** 移除 Forge **`Qwen3_06BConfig`** / **`Qwen3_06B`**（仅 Anima；其他模型仍用 **`Qwen3_4B`**，未改动）。
+  - **`split_state_dict`**：在 **`process_clip_state_dict`** **之前** 切出 TE 键；通过 **`anima_te_filter_prefixes`** 支持 HF **`text_encoders.*`**、Comfy **`cond_stage_model.*`** 及裸 **`qwen3_06b.*`** checkpoint 布局。
+  - **`AnimaBase`**：扩展 **`clip_target`**（六种布局）与 **`process_clip_state_dict`**；大 Anima **`class Anima(AnimaBase)`** 继承 TE 切出修复（此前为 **`Anima(BASE)`**）。
+  - 详情请参阅 [Release Notes（中文）](v1.7.3.md)。
+
 ## Version 1.7.2
 
 - **Nunchaku Z-Image Turbo：Lumina 检测回退修复**
