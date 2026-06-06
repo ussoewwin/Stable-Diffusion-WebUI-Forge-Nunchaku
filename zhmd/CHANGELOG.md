@@ -7,6 +7,13 @@
   </tr>
 </table>
 
+## Version 1.7.2
+
+- **Nunchaku Z-Image Turbo：Lumina 检测回退修复**
+  - Anima v1.7.1 的 Lumina 入口要求 `noise_refiner.k_norm`，但 Nunchaku Z-Image Turbo 导出使用 `norm_k`（稍后在 `svdq.py` 中重映射），导致 checkpoint 被误检为 Nunchaku SDXL 并报错 `You do not have CLIP state dict!`。
+  - 仅在 `modules_forge/packages/huggingface_guess/detection.py` 的 Lumina 入口接受 **`k_norm` 或 `norm_k`**；Anima 守卫、Lumina 块主体和 fuzzy SDXL 检测未改动。
+  - 详情请参阅 [Release Notes（中文）](v1.7.2.md)。
+
 ## Version 1.7.1
 
 - **Anima：ComfyUI import 重构**
@@ -14,11 +21,7 @@
   - 文本路径：**`comfy.text_encoders.anima.AnimaTokenizer`** + Forge **`Qwen3_06B`**（仅 embeddings）；**`preprocess_text_embeds`** 在 `get_learned_conditioning` 中对 Comfy UNet 运行一次（TE 侧无 `llm_adapter`）。
   - Loader/检测：**`remap_anima_state_dict`** 仅用于键名修复；**`comfy.model_detection.detect_unet_config`** 委托；**`k_model`** 对静止图像 latent 进行 4D↔5D 包装；**`compile_conditions`** 在缺少 pooled `y` 时省略。
   - UI preset 和 Additional modules（`qwen_3_06b_base`、`qwen_image_vae`）与 v1.7.0 相同。
-- **Nunchaku Z-Image Turbo：Lumina 检测回退修复**
-  - Anima v1.7.1 的 Lumina 入口要求 `noise_refiner.k_norm`，但 Nunchaku Z-Image Turbo 导出使用 `norm_k`（稍后在 `svdq.py` 中重映射），导致 checkpoint 被误检为 Nunchaku SDXL 并报错 `You do not have CLIP state dict!`。
-  - 仅在 `modules_forge/packages/huggingface_guess/detection.py` 的 Lumina 入口接受 **`k_norm` 或 `norm_k`**；Anima 守卫、Lumina 块主体和 fuzzy SDXL 检测未改动。
-
-详情请参阅 [Release Notes（中文）](v1.7.1.md)。
+  - 详情请参阅 [Release Notes（中文）](v1.7.1.md)。
 
 ## Version 1.7.0
 
