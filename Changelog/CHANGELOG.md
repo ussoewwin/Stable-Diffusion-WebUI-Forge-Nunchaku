@@ -12,7 +12,7 @@
 - **Nunchaku Z-Image Turbo: Lumina detection regression fix**
   - Anima v1.7.1 Lumina entry required `noise_refiner.k_norm`, but Nunchaku Z-Image Turbo exports use `norm_k` (remapped later in `svdq.py`), so checkpoints were mis-detected as Nunchaku SDXL and failed with `You do not have CLIP state dict!`.
   - Lumina entry now accepts **`k_norm` or `norm_k`** in `modules_forge/packages/huggingface_guess/detection.py` only; Anima guard, Lumina block body, and fuzzy SDXL detection unchanged.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/blob/main/RELEASE_NOTES/v1.7.2.md) for details.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.2) for details.
 
 ## Version 1.7.1
 
