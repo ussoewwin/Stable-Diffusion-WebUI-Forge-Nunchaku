@@ -14,7 +14,11 @@
   - Text path: **`comfy.text_encoders.anima.AnimaTokenizer`** + Forge **`Qwen3_06B`** (embeddings only); **`preprocess_text_embeds`** runs once on the Comfy UNet in `get_learned_conditioning` (no TE-side `llm_adapter`).
   - Loader/detection: **`remap_anima_state_dict`** for key-name fixes only; **`comfy.model_detection.detect_unet_config`** delegate; **`k_model`** 4D↔5D wrap for still-image latents; **`compile_conditions`** omits pooled `y` when absent.
   - UI preset and Additional modules (`qwen_3_06b_base`, `qwen_image_vae`) unchanged from v1.7.0.
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.1) for details.
+- **Nunchaku Z-Image Turbo: Lumina detection regression fix**
+  - Anima v1.7.1 Lumina entry required `noise_refiner.k_norm`, but Nunchaku Z-Image Turbo exports use `norm_k` (remapped later in `svdq.py`), so checkpoints were mis-detected as Nunchaku SDXL and failed with `You do not have CLIP state dict!`.
+  - Lumina entry now accepts **`k_norm` or `norm_k`** in `modules_forge/packages/huggingface_guess/detection.py` only; Anima guard, Lumina block body, and fuzzy SDXL detection unchanged.
+
+See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/blob/main/RELEASE_NOTES/v1.7.1.md) for details.
 
 ## Version 1.7.0
 
