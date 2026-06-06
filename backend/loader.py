@@ -167,6 +167,8 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
             load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
 
+            model.forge_spiece_model = getattr(guess, "forge_spiece_model", None)
+
             return model
         if cls_name == "Qwen3Model":
             if not isinstance(state_dict, dict) or len(state_dict) <= 16:
@@ -674,6 +676,7 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
         assert "model.layers.0.self_attn.q_norm.weight" not in asd
         for k, v in asd.items():
             if k == "spiece_model":
+                sd[f"{text_encoder_key_prefix}spiece_model"] = v
                 continue
             sd[f"{text_encoder_key_prefix}gemma2_2b.{k}"] = v
 

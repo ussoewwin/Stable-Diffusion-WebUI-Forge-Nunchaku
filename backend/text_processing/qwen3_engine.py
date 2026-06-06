@@ -1,5 +1,5 @@
-# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.75/comfy/sd1_clip.py
-# https://github.com/comfyanonymous/ComfyUI/blob/v0.3.75/comfy/text_encoders/z_image.py
+# Forge glue: comfy.text_encoders.z_image.ZImageTokenizer + Forge Qwen3_4B weights.
+# https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/text_encoders/z_image.py
 
 from typing import TYPE_CHECKING
 
@@ -10,7 +10,10 @@ import torch
 
 from backend import memory_management
 from backend.text_processing import emphasis, parsing
+from comfy.text_encoders.z_image import ZImageTokenizer
 from modules.shared import opts
+
+_COMFY_CLIP_KEY = "qwen3_4b"
 
 
 class PromptChunk:
@@ -19,25 +22,43 @@ class PromptChunk:
         self.multipliers = []
 
 
+def _flat_comfy_token_batch(pairs: dict, clip_key: str, segment_weight: float) -> tuple[list[int], list[float]]:
+    tokens: list[int] = []
+    multipliers: list[float] = []
+    for batch in pairs[clip_key]:
+        for item in batch:
+            token_id = item[0]
+            if isinstance(token_id, (int, float)):
+                tokens.append(int(token_id))
+                multipliers.append(float(segment_weight))
+    return tokens, multipliers
+
+
 class Qwen3TextProcessingEngine:
-    def __init__(self, text_encoder, tokenizer):
+    def __init__(self, text_encoder, tokenizer=None):
         super().__init__()
 
         self.text_encoder = text_encoder
-        self.tokenizer = tokenizer
+        self.comfy_tokenizer = ZImageTokenizer()
 
         self.id_pad = 151643
-        self.llama_template = "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
         self.intermediate_output = -2
         self.layer_norm_hidden_state = False
 
+    def _comfy_tokenize_text(self, text: str, weight: float) -> tuple[list[int], list[float]]:
+        # ZImageTokenizer already passes disable_weights=True to super(); do not pass it here.
+        pairs = self.comfy_tokenizer.tokenize_with_weights(text, return_word_ids=False)
+        return _flat_comfy_token_batch(pairs, _COMFY_CLIP_KEY, weight)
+
     def tokenize(self, texts):
-        llama_texts = [self.llama_template.format(text) for text in texts]
-        return self.tokenizer(llama_texts)["input_ids"]
+        tokenized = []
+        for text in texts:
+            tokens, _ = self._comfy_tokenize_text(text, 1.0)
+            tokenized.append(tokens)
+        return tokenized
 
     def tokenize_line(self, line: str):
         parsed = parsing.parse_prompt_attention(line, self.emphasis.name)
-        tokenized = self.tokenize([text for text, _ in parsed])
 
         chunks = []
         chunk = PromptChunk()
@@ -48,13 +69,10 @@ class Qwen3TextProcessingEngine:
             chunks.append(chunk)
             chunk = PromptChunk()
 
-        for tokens, (text, weight) in zip(tokenized, parsed):
-            position = 0
-            while position < len(tokens):
-                token = tokens[position]
-                chunk.tokens.append(token)
-                chunk.multipliers.append(weight)
-                position += 1
+        for text, weight in parsed:
+            tokens, multipliers = self._comfy_tokenize_text(text, weight)
+            chunk.tokens.extend(tokens)
+            chunk.multipliers.extend(multipliers)
 
         if chunk.tokens or not chunks:
             next_chunk()
@@ -98,7 +116,6 @@ class Qwen3TextProcessingEngine:
             attention_mask = []
             tokens_temp = []
             eos = False
-            index = 0
 
             for t in tokens:
                 token = int(t)
@@ -106,12 +123,9 @@ class Qwen3TextProcessingEngine:
                 tokens_temp += [token]
                 if not eos and token == self.id_pad:
                     eos = True
-                index += 1
 
             tokens_embed = torch.tensor([tokens_temp], device=device, dtype=torch.long)
             tokens_embed = self.text_encoder.get_input_embeddings()(tokens_embed)
-
-            index = 0
 
             embeds_out.append(tokens_embed)
             attention_masks.append(attention_mask)

@@ -350,9 +350,11 @@ class Lumina2(BASE):
 
     def clip_target(self, state_dict: dict):
         pref = self.text_encoder_key_prefix[0]
+        spiece_key = "{}spiece_model".format(pref)
+        self.forge_spiece_model = state_dict.pop(spiece_key, None)
         if "{}gemma2_2b.transformer.model.embed_tokens.weight".format(pref) in state_dict:
             state_dict.pop("{}gemma2_2b.logit_scale".format(pref), None)
-            state_dict.pop("{}spiece_model".format(pref), None)
+            state_dict.pop(spiece_key, None)
             return {"gemma2_2b.transformer": "text_encoder"}
         else:
             return {"gemma2_2b": "text_encoder"}
