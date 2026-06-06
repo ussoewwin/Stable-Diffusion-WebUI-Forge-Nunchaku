@@ -37,6 +37,7 @@ logging.getLogger("diffusers").setLevel(logging.ERROR)
 dir_path = os.path.dirname(__file__)
 
 
+
 def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_path, state_dict):
     config_path = os.path.join(repo_path, component_name)
 
@@ -179,9 +180,23 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             _anima_te = isinstance(guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68))
 
             if _anima_te:
-                from backend.nn.llm.llama import Qwen3_06B as QTE
-            else:
-                from backend.nn.llm.llama import Qwen3_4B as QTE
+                from comfy.sd import load_text_encoder_state_dicts
+
+                te_sd = state_dict
+                if te_sd and "model.layers.0.post_attention_layernorm.weight" not in te_sd:
+                    te_sd = dict(te_sd)
+                    te_sd = guess.process_clip_state_dict(te_sd)
+                    for prefix in (
+                        "qwen3_06b.transformer.",
+                        "cond_stage_model.qwen3_06b.transformer.",
+                        "qwen3_06b.",
+                        "transformer.",
+                    ):
+                        part = try_filter_state_dict(dict(te_sd), [prefix])
+                        if part:
+                            te_sd = part
+                            break
+                return load_text_encoder_state_dicts([te_sd])
 
             storage_dtype = memory_management.text_encoder_dtype()
             state_dict_dtype = memory_management.state_dict_dtype(state_dict)
@@ -196,6 +211,8 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             else:
                 print(f"Using Default Qwen3 Data Type: {storage_dtype}")
 
+            from backend.nn.llm.llama import Qwen3_4B as QTE
+
             if storage_dtype in ["nf4", "fp4", "gguf"]:
                 with modeling_utils.no_init_weights():
                     with using_forge_operations(device=memory_management.cpu, dtype=memory_management.text_encoder_dtype(), manual_cast_enabled=False, bnb_dtype=storage_dtype):
@@ -205,10 +222,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     with using_forge_operations(device=memory_management.cpu, dtype=storage_dtype, manual_cast_enabled=True):
                         model = QTE(config)
 
-            if _anima_te:
-                load_state_dict(model, state_dict, log_name=cls_name, ignore_start="lm_head.")
-            else:
-                load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
+            load_state_dict(model, state_dict, log_name=cls_name, ignore_errors=[])
 
             return model
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
@@ -756,10 +770,14 @@ def split_state_dict(sd, additional_state_dicts: list = None):
 
     state_dict = {guess.unet_target: try_filter_state_dict(sd, guess.unet_key_prefix), guess.vae_target: try_filter_state_dict(sd, guess.vae_key_prefix)}
 
-    sd = guess.process_clip_state_dict(sd)
-
     for k, v in guess.clip_target.items():
-        state_dict[v] = try_filter_state_dict(sd, [k + "."])
+        if hasattr(guess, "anima_te_filter_prefixes"):
+            prefixes = guess.anima_te_filter_prefixes(k)
+        else:
+            prefixes = [k + ".", f"{guess.text_encoder_key_prefix[0]}{k}."]
+        state_dict[v] = try_filter_state_dict(sd, prefixes)
+
+    sd = guess.process_clip_state_dict(sd)
 
     state_dict["ignore"] = sd
 
