@@ -2,6 +2,7 @@ import torch
 from modules_forge.packages.huggingface_guess import model_list
 
 from backend import memory_management
+from backend.comfy_te_glue import offload_comfy_clip
 from backend.diffusion_engine.base import ForgeDiffusionEngine, ForgeObjects
 from backend.modules.k_prediction import PredictionDiscreteFlow
 from backend.patcher.unet import UnetPatcher
@@ -48,6 +49,7 @@ class Anima(ForgeDiffusionEngine):
         self.forge_objects.unet.model.predictor.set_parameters(shift=float(shift))
 
         cond = self.text_processing_engine_anima(prompt)
+        offload_comfy_clip(self.forge_objects.clip)
 
         memory_management.load_model_gpu(self.forge_objects.unet)
         diffusion_model = self.forge_objects.unet.model.diffusion_model

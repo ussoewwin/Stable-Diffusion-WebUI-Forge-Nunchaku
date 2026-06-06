@@ -366,6 +366,9 @@ def forge_model_reload():
     sd_model = forge_loader(state_dict, additional_state_dicts=additional_state_dicts)
     timer.record("forge model load")
 
+    if sd_model is None:
+        raise ValueError("Failed to recognize model type! (forge_loader returned None)")
+
     sd_model.extra_generation_params = {}
     sd_model.comments = []
     sd_model.sd_checkpoint_info = checkpoint_info
