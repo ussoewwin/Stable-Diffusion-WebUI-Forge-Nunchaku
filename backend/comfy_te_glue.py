@@ -1,8 +1,8 @@
 """
 Forge glue for Comfy ``sd.CLIP`` text encoders (Lumina2 / Z-Image / Anima Step 5).
 
-VRAM contract (match v1.7.3 Forge ``Gemma2_2B`` / ``Qwen3_4B`` path):
-- TE weights init on CPU (``using_forge_operations(device=cpu)`` equivalent)
+VRAM contract:
+- TE weights init on CPU (``initial_device=memory_management.cpu``)
 - GPU only inside ``encode_from_tokens`` → ``CLIP.load_model``
 - TE off GPU before UNet sampling when callers invoke ``offload_comfy_clip``
 """
