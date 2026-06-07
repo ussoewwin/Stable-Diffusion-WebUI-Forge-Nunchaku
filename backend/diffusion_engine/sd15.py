@@ -17,6 +17,9 @@ class StableDiffusion(ForgeDiffusionEngine):
     def __init__(self, estimated_config, huggingface_components):
         super().__init__(estimated_config, huggingface_components)
 
+        if "text_encoder" not in huggingface_components:
+            raise ValueError("Error: Your SD1.5 model is missing a CLIP Text Encoder. The checkpoint you loaded does not contain CLIP weights, and no compatible CLIP model was selected. Please select a valid CLIP model (not an LLM like Qwen) in the 'VAE / Text Encoder' dropdown.")
+            
         clip = CLIP(model_dict={"clip_l": huggingface_components["text_encoder"]}, tokenizer_dict={"clip_l": huggingface_components["tokenizer"]})
 
         vae = VAE(model=huggingface_components["vae"])

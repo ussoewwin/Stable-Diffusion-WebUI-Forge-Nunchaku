@@ -141,8 +141,9 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             load_state_dict(model, state_dict)
             return model
         if component_name.startswith("text_encoder") and cls_name in ["CLIPTextModel", "CLIPTextModelWithProjection"]:
-            assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have CLIP state dict!"
-
+            if not isinstance(state_dict, dict) or len(state_dict) <= 16:
+                return None
+            
             from transformers import CLIPTextConfig, CLIPTextModel
 
             config = CLIPTextConfig.from_pretrained(config_path)
@@ -450,6 +451,23 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
     vae_key_prefix = guess.vae_key_prefix[0]
     text_encoder_key_prefix = guess.text_encoder_key_prefix[0]
 
+    # SD1系/SDXL系のレガシーアーキテクチャ判定
+    is_legacy_model = False
+    legacy_test_key = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
+    if legacy_test_key in sd:
+        match sd[legacy_test_key].shape[1]:
+            case 768 | 2048:
+                is_legacy_model = True
+    
+    # 追加モジュールがLLM（Qwen3, Gemma等）であるかの判定
+    is_llm_asd = any(k.startswith("qwen3_") or k.startswith("gemma2_") for k in asd.keys())
+    
+    # レガシーモデルに対してLLMを混入させようとした場合は合体をブロックする
+    if is_legacy_model and is_llm_asd:
+        print(f"Skipping incompatible LLM text encoder '{path}' for legacy SD1/SDXL model.")
+        return sd
+
+
     if "enc.blk.0.attn_k.weight" in asd:
         gguf_t5_format = {  # city96
             "enc.": "encoder.",
@@ -676,6 +694,9 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
                         new_k = k.replace(old_prefix, new_prefix)
                         sd[new_k] = v
 
+    if model_type in ("sd1", "xlrf", "sdxl"):
+        return sd
+
     if "encoder.block.0.layer.0.SelfAttention.k.weight" in asd:
         _key = "umt5xxl" if asd["shared.weight"].size(0) == 256384 else "t5xxl"
         keys_to_delete = [k for k in sd if k.startswith(f"{text_encoder_key_prefix}{_key}.")]
@@ -778,14 +799,16 @@ def split_state_dict(sd, additional_state_dicts: list = None):
 
     state_dict = {guess.unet_target: try_filter_state_dict(sd, guess.unet_key_prefix), guess.vae_target: try_filter_state_dict(sd, guess.vae_key_prefix)}
 
+    sd = guess.process_clip_state_dict(sd)
+
     for k, v in guess.clip_target.items():
-        if hasattr(guess, "te_filter_prefixes"):
+        if hasattr(guess, "anima_te_filter_prefixes"):
+            prefixes = guess.anima_te_filter_prefixes(k)
+        elif hasattr(guess, "te_filter_prefixes"):
             prefixes = guess.te_filter_prefixes(k)
         else:
             prefixes = [k + ".", f"{guess.text_encoder_key_prefix[0]}{k}."]
         state_dict[v] = try_filter_state_dict(sd, prefixes)
-
-    sd = guess.process_clip_state_dict(sd)
 
     state_dict["ignore"] = sd
 
