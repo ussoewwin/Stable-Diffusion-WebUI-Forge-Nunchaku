@@ -19,6 +19,9 @@ class StableDiffusionXL(ForgeDiffusionEngine):
     def __init__(self, estimated_config, huggingface_components):
         super().__init__(estimated_config, huggingface_components)
 
+        if "text_encoder" not in huggingface_components or "text_encoder_2" not in huggingface_components:
+            raise ValueError("Error: Your SDXL model is missing a CLIP Text Encoder. The checkpoint you loaded does not contain CLIP weights, and no compatible CLIP model was selected. Please select a valid CLIP model in the 'VAE / Text Encoder' dropdown.")
+            
         clip = CLIP(model_dict={"clip_l": huggingface_components["text_encoder"], "clip_g": huggingface_components["text_encoder_2"]}, tokenizer_dict={"clip_l": huggingface_components["tokenizer"], "clip_g": huggingface_components["tokenizer_2"]})
 
         vae = VAE(model=huggingface_components["vae"])
@@ -134,6 +137,9 @@ class StableDiffusionXLRefiner(ForgeDiffusionEngine):
 
     def __init__(self, estimated_config, huggingface_components):
         super().__init__(estimated_config, huggingface_components)
+
+        if "text_encoder" not in huggingface_components:
+            raise ValueError("Error: Your SDXL Refiner model is missing a CLIP Text Encoder. The checkpoint you loaded does not contain CLIP weights, and no compatible CLIP model was selected. Please select a valid CLIP model in the 'VAE / Text Encoder' dropdown.")
 
         clip = CLIP(
             model_dict={"clip_g": huggingface_components["text_encoder"]},
