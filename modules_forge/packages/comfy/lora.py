@@ -111,44 +111,51 @@ def model_lora_keys_clip(model, key_map={}):
             key_map["text_encoders.{}".format(k[: -len(".weight")])] = k  # generic lora format without any weird key names
 
     text_model_lora_key = "lora_te_text_model_encoder_layers_{}_{}"
+    # transformers 4.x–5.5: clip_*.transformer.text_model.encoder.layers.*
+    # transformers 5.6+ (IntegratedCLIP + f1c299e loader): clip_*.transformer.encoder.layers.*
+    clip_layer_paths = (
+        "transformer.text_model.encoder.layers.{}.{}.weight",
+        "transformer.encoder.layers.{}.{}.weight",
+    )
     clip_l_present = False
     clip_g_present = False
     for b in range(32):  # TODO: clean up
         for c in LORA_CLIP_MAP:
-            k = "clip_h.transformer.text_model.encoder.layers.{}.{}.weight".format(b, c)
-            if k in sdk:
-                lora_key = text_model_lora_key.format(b, LORA_CLIP_MAP[c])
-                key_map[lora_key] = k
-                lora_key = "lora_te1_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])
-                key_map[lora_key] = k
-                lora_key = "text_encoder.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
-                key_map[lora_key] = k
-
-            k = "clip_l.transformer.text_model.encoder.layers.{}.{}.weight".format(b, c)
-            if k in sdk:
-                lora_key = text_model_lora_key.format(b, LORA_CLIP_MAP[c])
-                key_map[lora_key] = k
-                lora_key = "lora_te1_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # SDXL base
-                key_map[lora_key] = k
-                clip_l_present = True
-                lora_key = "text_encoder.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
-                key_map[lora_key] = k
-
-            k = "clip_g.transformer.text_model.encoder.layers.{}.{}.weight".format(b, c)
-            if k in sdk:
-                clip_g_present = True
-                if clip_l_present:
-                    lora_key = "lora_te2_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # SDXL base
+            for path in clip_layer_paths:
+                k = "clip_h.{}".format(path.format(b, c))
+                if k in sdk:
+                    lora_key = text_model_lora_key.format(b, LORA_CLIP_MAP[c])
                     key_map[lora_key] = k
-                    lora_key = "text_encoder_2.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
-                    key_map[lora_key] = k
-                else:
-                    lora_key = "lora_te_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # TODO: test if this is correct for SDXL-Refiner
+                    lora_key = "lora_te1_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])
                     key_map[lora_key] = k
                     lora_key = "text_encoder.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
                     key_map[lora_key] = k
-                    lora_key = "lora_prior_te_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # cascade lora: TODO put lora key prefix in the model config
+
+                k = "clip_l.{}".format(path.format(b, c))
+                if k in sdk:
+                    lora_key = text_model_lora_key.format(b, LORA_CLIP_MAP[c])
                     key_map[lora_key] = k
+                    lora_key = "lora_te1_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # SDXL base
+                    key_map[lora_key] = k
+                    clip_l_present = True
+                    lora_key = "text_encoder.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
+                    key_map[lora_key] = k
+
+                k = "clip_g.{}".format(path.format(b, c))
+                if k in sdk:
+                    clip_g_present = True
+                    if clip_l_present:
+                        lora_key = "lora_te2_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # SDXL base
+                        key_map[lora_key] = k
+                        lora_key = "text_encoder_2.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
+                        key_map[lora_key] = k
+                    else:
+                        lora_key = "lora_te_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # TODO: test if this is correct for SDXL-Refiner
+                        key_map[lora_key] = k
+                        lora_key = "text_encoder.text_model.encoder.layers.{}.{}".format(b, c)  # diffusers lora
+                        key_map[lora_key] = k
+                        lora_key = "lora_prior_te_text_model_encoder_layers_{}_{}".format(b, LORA_CLIP_MAP[c])  # cascade lora: TODO put lora key prefix in the model config
+                        key_map[lora_key] = k
 
     for k in sdk:
         if k.endswith(".weight") and k.startswith("t5xxl.transformer."):  # OneTrainer SD3 and Flux lora
