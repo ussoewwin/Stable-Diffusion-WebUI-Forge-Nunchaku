@@ -12,7 +12,7 @@
 - **Pony / SDXL LoRA（CLIP-L）：IntegratedCLIP 键映射**
   - **`modules_forge/packages/comfy/lora.py`** 中的 **`model_lora_keys_clip()`** 现同时尝试 **`transformer.text_model.encoder.layers.*`**（Transformers 4.x–5.5）与 **`transformer.encoder.layers.*`**（Transformers 5.6+ / IntegratedCLIP），使 Pony / SDXL 上的 **`lora_te1_*`** 键正确绑定。
   - 降低 CLIP 未匹配键超过 **`extensions-builtin/sd_forge_lora/networks.py`** 中 50% 门限时出现 **`[LORA] LoRA mismatch for CLIP`**、整包 LoRA 被跳过的情况（即使 UNet 键可匹配）。
-  - 合并 PR #1（`3a8ea0c` / `3d1950d`）及 Pony SDXL LoRA CLIP 修复（`08e6e70`）。
+  - 提交 `3a8ea0c` / `3d1950d`（clip_layer_paths）及 Pony SDXL LoRA CLIP 修复（`08e6e70`）。
   - 详情请参阅 [Release Notes（中文）](v1.7.4.md)。
 
 ## Version 1.7.3
