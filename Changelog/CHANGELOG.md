@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.7.4
+
+- **Pony / SDXL LoRA (CLIP-L): IntegratedCLIP key mapping**
+  - **`model_lora_keys_clip()`** in **`modules_forge/packages/comfy/lora.py`** now tries both **`transformer.text_model.encoder.layers.*`** (Transformers 4.x–5.5) and **`transformer.encoder.layers.*`** (Transformers 5.6+ / IntegratedCLIP) so **`lora_te1_*`** keys bind on Pony / SDXL checkpoints.
+  - Reduces **`[LORA] LoRA mismatch for CLIP`** when unmatched CLIP keys exceed the 50% gate in **`extensions-builtin/sd_forge_lora/networks.py`** (whole-file skip even if UNet keys match).
+  - Merged PR #1 (`3a8ea0c` / `3d1950d`) and Pony SDXL LoRA CLIP fix (`08e6e70`).
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.4) for details.
+
 ## Version 1.7.3
 
 - **Anima: ComfyUI text encoder import (Step 5a)**
