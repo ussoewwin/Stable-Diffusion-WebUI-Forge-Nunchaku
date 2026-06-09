@@ -9,9 +9,7 @@
 
 ## Version 1.7.5
 
-- **ADetailer（内置扩展）**
-  - **Linux/macOS 上的 InsightFace：** `extensions-builtin/adetailer/install.py` 现按 `sys.platform` 分支。非 Windows 主机通过 PyPI 执行 `pip install insightface` 安装 InsightFace，不再从 Hugging Face 下载仅适用于 Windows 的 wheel（修复 Linux 上启动/安装失败）。
-  - **重复人脸处理：** 若某张图像已执行过人脸检测 pass，则跳过第二次 pass，避免对同一输出重复精修。
+- **ADetailer（内置扩展）：** 人脸检测不再使用 InsightFace（仅 YOLO）。
 
 ## Version 1.7.4
 

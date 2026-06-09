@@ -9,9 +9,7 @@
 
 ## Version 1.7.5
 
-- **ADetailer (built-in extension)**
-  - **InsightFace on Linux/macOS:** `extensions-builtin/adetailer/install.py` now branches on `sys.platform`. Non-Windows hosts install InsightFace from PyPI via `pip install insightface` instead of downloading Windows-only wheels from Hugging Face (fixes startup/install failures on Linux).
-  - **Duplicate face passes:** Skip applying a second face-detection pass to the same image when a prior pass already ran on that image, avoiding double refinement on one output.
+- **ADetailer (built-in extension):** Face detection no longer uses InsightFace (YOLO only).
 
 ## Version 1.7.4
 
