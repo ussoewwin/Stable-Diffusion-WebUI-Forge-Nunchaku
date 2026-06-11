@@ -246,7 +246,7 @@
 ## Version 1.0.7
 
 - **新增 ADetailer 作为内置扩展**
-  - 集成 [ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe) 作为标准内置功能
+  - 集成 [ADetailer](https://github.com/Bing-su/adetailer) 作为标准内置功能
   - 使用 InsightFace 替代 MediaPipe，兼容 Python 3.13
   - 包含 YOLOv8、YOLOv11 和 InsightFace 混合检测系统
   - 修复 ControlNet 预处理器初始化问题

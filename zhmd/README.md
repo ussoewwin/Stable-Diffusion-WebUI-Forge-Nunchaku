@@ -169,8 +169,8 @@
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)**  
   Nunchaku Qwen Image 和 Nunchaku Z-Image Turbo 的 LoRA Loader 与 Diffsynth ControlNet Loader，作者 [@ussoewwin](https://github.com/ussoewwin)
 
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
-  使用 InsightFace 替代 MediaPipe 的 Python 3.13 兼容 ADetailer，作者 [@ussoewwin](https://github.com/ussoewwin)
+- **[ADetailer](https://github.com/Bing-su/adetailer)**  
+  使用检测模型自动检测、遮罩和修复的扩展，作者 [@Bing-su](https://github.com/Bing-su)
 
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)**  
   Automatic1111 扩展 — 可配置下拉菜单以更改 txt2img 和 img2img 标签页中的设置，作者 [@Zyin055](https://github.com/Zyin055)
@@ -194,7 +194,7 @@
 - **[ComfyUI](https://github.com/Comfy-Org/ComfyUI)** - GPL-3.0
 - **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Apache 2.0
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Apache 2.0
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
+- **[ADetailer](https://github.com/Bing-su/adetailer)** - AGPL-3.0
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)** - MIT

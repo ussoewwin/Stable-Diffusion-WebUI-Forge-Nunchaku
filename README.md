@@ -169,8 +169,8 @@ This project is built upon the following repositories:
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)**  
   LoRA Loader & Diffsynth ControlNet Loader for Nunchaku Qwen Image & Nunchaku Z-Image Turbo by [@ussoewwin](https://github.com/ussoewwin)
 
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)**  
-  ADetailer with Python 3.13 support using InsightFace instead of MediaPipe by [@ussoewwin](https://github.com/ussoewwin)
+- **[ADetailer](https://github.com/Bing-su/adetailer)**  
+  Auto detecting, masking and inpainting with detection model by [@Bing-su](https://github.com/Bing-su)
 
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)**  
   Extension for Automatic1111 - configurable dropdown to change settings in txt2img and img2img tabs by [@Zyin055](https://github.com/Zyin055)
@@ -194,7 +194,7 @@ This project is built upon the following repositories, each with their respectiv
 - **[ComfyUI](https://github.com/Comfy-Org/ComfyUI)** - GPL-3.0
 - **[ComfyUI-nunchaku-unofficial-loader](https://github.com/ussoewwin/ComfyUI-nunchaku-unofficial-loader)** - Apache 2.0
 - **[ComfyUI-QwenImageLoraLoader](https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader)** - Apache 2.0
-- **[ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe)** - GPL-3.0
+- **[ADetailer](https://github.com/Bing-su/adetailer)** - AGPL-3.0
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)** - MIT
