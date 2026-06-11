@@ -247,7 +247,7 @@
 ## Version 1.0.7
 
 - **Added ADetailer as built-in extension**
-  - Integrated [ADetailer_without_mediapipe](https://github.com/ussoewwin/ADetailer_without_mediapipe) as a standard built-in feature
+  - Integrated [ADetailer](https://github.com/Bing-su/adetailer) as a standard built-in feature
   - Python 3.13 compatible with InsightFace instead of MediaPipe
   - Includes YOLOv8, YOLOv11, and InsightFace hybrid detection system
   - Fixed ControlNet preprocessor initialization issue

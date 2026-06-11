@@ -918,16 +918,23 @@ class AfterDetailerScript(scripts.Script):
 
         is_processed = False
         face_already_processed = False
+        hand_already_processed = False
         with CNHijackRestore(), pause_total_tqdm(), cn_allow_script_control():
             for n, args in enumerate(arg_list):
                 if args.need_skip():
                     continue
-                is_face_tab = "face" in args.ad_model.lower()
+                model_key = args.ad_model.lower()
+                is_face_tab = "face" in model_key
+                is_hand_tab = "hand" in model_key
                 if is_face_tab and face_already_processed:
+                    continue
+                if is_hand_tab and hand_already_processed:
                     continue
                 ran = self._postprocess_image_inner(p, pp, args, n=n)
                 if ran and is_face_tab:
                     face_already_processed = True
+                if ran and is_hand_tab:
+                    hand_already_processed = True
                 is_processed |= ran
 
         if is_processed and not is_skip_img2img(p):
