@@ -933,6 +933,19 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
             # Use estimated prediction config if no suitable prediction type found
             yaml_config_prediction_type = ""
 
+    # Fallback: detect v-prediction from safetensors metadata (Pony/Illustrious/ISDXL)
+    if not yaml_config_prediction_type:
+        try:
+            if isinstance(sd, (str, os.PathLike)):
+                metadata = load_torch_file(sd, return_metadata=True)[1]
+                if metadata and "modelspec.prediction_type" in metadata:
+                    pt = metadata["modelspec.prediction_type"].lower()
+                    if pt == "v":
+                        yaml_config_prediction_type = "v_prediction"
+                        print(f"[V-Prediction] Detected from metadata: {os.path.basename(sd)}")
+        except Exception:
+            pass
+
     if has_prediction_type:
         if yaml_config_prediction_type:
             huggingface_components["scheduler"].config.prediction_type = yaml_config_prediction_type
