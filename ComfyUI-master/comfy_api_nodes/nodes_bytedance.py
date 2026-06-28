@@ -7,6 +7,7 @@ from io import BytesIO
 import torch
 from typing_extensions import override
 
+from comfy.utils import common_upscale
 from comfy_api.latest import IO, ComfyExtension, Input, Types
 from comfy_api_nodes.apis.bytedance import (
     RECOMMENDED_PRESETS,
@@ -14,7 +15,6 @@ from comfy_api_nodes.apis.bytedance import (
     RECOMMENDED_PRESETS_SEEDREAM_4_0,
     RECOMMENDED_PRESETS_SEEDREAM_4_5,
     RECOMMENDED_PRESETS_SEEDREAM_5_LITE,
-    SEEDANCE2_PRICE_PER_1K_TOKENS,
     SEEDANCE2_REF_VIDEO_PIXEL_LIMITS,
     VIDEO_TASKS_EXECUTION_TIME,
     GetAssetResponse,
@@ -39,6 +39,7 @@ from comfy_api_nodes.apis.bytedance import (
     TaskVideoContentUrl,
     Text2ImageTaskCreationRequest,
     Text2VideoTaskCreationRequest,
+    seedance2_price_per_1k_tokens,
 )
 from comfy_api_nodes.util import (
     ApiEndpoint,
@@ -88,6 +89,7 @@ BYTEPLUS_SEEDANCE2_TASK_STATUS_ENDPOINT = "/proxy/byteplus-seedance2/api/v3/cont
 SEEDANCE_MODELS = {
     "Seedance 2.0": "dreamina-seedance-2-0-260128",
     "Seedance 2.0 Fast": "dreamina-seedance-2-0-fast-260128",
+    "Seedance 2.0 Mini": "dreamina-seedance-2-0-mini",
 }
 
 DEPRECATED_MODELS = {"seedance-1-0-lite-t2v-250428", "seedance-1-0-lite-i2v-250428"}
@@ -129,6 +131,44 @@ def _prepare_seedance_image(image: Input.Image) -> Input.Image:
     image = downscale_image_tensor_by_max_side(image, max_side=6000)
     validate_image_dimensions(image, min_width=300, min_height=300, max_width=6000, max_height=6000)
     return image
+
+
+# Supported output aspect ratios, used to pre-size FLF frames to matching pixel pair to avoid the 1080p stretch jump.
+SEEDANCE2_RATIO_WH = {
+    "16:9": (16, 9),
+    "4:3": (4, 3),
+    "1:1": (1, 1),
+    "3:4": (3, 4),
+    "9:16": (9, 16),
+    "21:9": (21, 9),
+}
+SEEDANCE2_RES_SHORT_SIDE = {"480p": 480, "720p": 720, "1080p": 1080, "4k": 2160}
+
+
+def _seedance2_target_dims(resolution: str, ratio: str, image: torch.Tensor) -> tuple[int, int]:
+    """Exact supported output (width, height) for (resolution, ratio).
+
+    The shorter side equals the resolution number (e.g. 1080p 16:9 -> 1920x1080). For ratio
+    "adaptive" (or any unexpected value) the ratio is derived from the image's own aspect, snapped
+    to the nearest supported ratio, so the output keeps the frame's orientation.
+    """
+    short = SEEDANCE2_RES_SHORT_SIDE[resolution]
+    if ratio not in SEEDANCE2_RATIO_WH:
+        aspect = image.shape[-2] / image.shape[-3]  # W / H; tensor is (B, H, W, C)
+        ratio = min(SEEDANCE2_RATIO_WH, key=lambda k: abs(SEEDANCE2_RATIO_WH[k][0] / SEEDANCE2_RATIO_WH[k][1] - aspect))
+    rw, rh = SEEDANCE2_RATIO_WH[ratio]
+    if rw >= rh:  # landscape or square: shorter side is the height
+        out_w, out_h = round(short * rw / rh), short
+    else:  # portrait: shorter side is the width
+        out_w, out_h = short, round(short * rh / rw)
+    return out_w - out_w % 2, out_h - out_h % 2
+
+
+def _resize_to_exact(image: torch.Tensor, width: int, height: int) -> torch.Tensor:
+    """Center-crop to the target aspect and resize to exactly width x height (lanczos)."""
+    samples = image.movedim(-1, 1)  # (B, H, W, C) -> (B, C, H, W)
+    resized = common_upscale(samples, width, height, "lanczos", "center")
+    return resized.movedim(1, -1)
 
 
 async def _resolve_reference_assets(
@@ -338,9 +378,9 @@ async def _seedance_virtual_library_upload_video_asset(
     return f"asset://{create_resp.asset_id}"
 
 
-def _seedance2_price_extractor(model_id: str, has_video_input: bool):
+def _seedance2_price_extractor(model_id: str, has_video_input: bool, resolution: str):
     """Returns a price_extractor closure for Seedance 2.0 poll_op."""
-    rate = SEEDANCE2_PRICE_PER_1K_TOKENS.get((model_id, has_video_input))
+    rate = seedance2_price_per_1k_tokens(model_id, has_video_input, resolution)
     if rate is None:
         return None
 
@@ -368,7 +408,7 @@ class ByteDanceImageNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceImageNode",
             display_name="ByteDance Image",
-            category="image/partner/ByteDance",
+            category="partner/image/ByteDance",
             description="Generate images using ByteDance models via api based on prompt",
             inputs=[
                 IO.Combo.Input("model", options=["seedream-3-0-t2i-250415"]),
@@ -492,7 +532,7 @@ class ByteDanceSeedreamNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceSeedreamNode",
             display_name="ByteDance Seedream 4.5 & 5.0",
-            category="image/partner/ByteDance",
+            category="partner/image/ByteDance",
             description="Unified text-to-image generation and precise single-sentence editing at up to 4K resolution.",
             inputs=[
                 IO.Combo.Input(
@@ -754,7 +794,7 @@ class ByteDanceSeedreamNodeV2(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceSeedreamNodeV2",
             display_name="ByteDance Seedream 4.5 & 5.0",
-            category="image/partner/ByteDance",
+            category="partner/image/ByteDance",
             description="Unified text-to-image generation and precise single-sentence editing at up to 4K resolution.",
             inputs=[
                 IO.String.Input(
@@ -920,7 +960,7 @@ class ByteDanceTextToVideoNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceTextToVideoNode",
             display_name="ByteDance Text to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using ByteDance models via api based on prompt",
             inputs=[
                 IO.Combo.Input(
@@ -1048,7 +1088,7 @@ class ByteDanceImageToVideoNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceImageToVideoNode",
             display_name="ByteDance Image to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using ByteDance models via api based on image and prompt",
             inputs=[
                 IO.Combo.Input(
@@ -1185,7 +1225,7 @@ class ByteDanceFirstLastFrameNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceFirstLastFrameNode",
             display_name="ByteDance First-Last-Frame to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using prompt and first and last frames.",
             inputs=[
                 IO.Combo.Input(
@@ -1333,7 +1373,7 @@ class ByteDanceImageReferenceNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceImageReferenceNode",
             display_name="ByteDance Reference Images to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using prompt and reference images.",
             inputs=[
                 IO.Combo.Input(
@@ -1576,16 +1616,18 @@ class ByteDance2TextToVideoNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDance2TextToVideoNode",
             display_name="ByteDance Seedance 2.0 Text to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using Seedance 2.0 models based on a text prompt.",
             inputs=[
                 IO.DynamicCombo.Input(
                     "model",
                     options=[
-                        IO.DynamicCombo.Option("Seedance 2.0", _seedance2_text_inputs(["480p", "720p", "1080p"])),
+                        IO.DynamicCombo.Option("Seedance 2.0", _seedance2_text_inputs(["480p", "720p", "1080p", "4k"])),
                         IO.DynamicCombo.Option("Seedance 2.0 Fast", _seedance2_text_inputs(["480p", "720p"])),
+                        IO.DynamicCombo.Option("Seedance 2.0 Mini", _seedance2_text_inputs(["480p", "720p"])),
                     ],
-                    tooltip="Seedance 2.0 for maximum quality; Seedance 2.0 Fast for speed optimization.",
+                    tooltip="Seedance 2.0 for maximum quality; Fast for speed optimization; "
+                    "Mini for the fastest, lowest-cost generation.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1621,11 +1663,16 @@ class ByteDance2TextToVideoNode(IO.ComfyNode):
                   $rate480 := 10044;
                   $rate720 := 21600;
                   $rate1080 := 48800;
+                  $rate4k := 195200;
                   $m := widgets.model;
-                  $pricePer1K := $contains($m, "fast") ? 0.008008 : 0.01001;
                   $res := $lookup(widgets, "model.resolution");
                   $dur := $lookup(widgets, "model.duration");
-                  $rate := $res = "1080p" ? $rate1080 :
+                  $pricePer1K := $res = "4k"    ? 0.00572 :
+                                 $res = "1080p" ? 0.011011 :
+                                 $contains($m, "mini") ? 0.005005 :
+                                 $contains($m, "fast") ? 0.008008 : 0.01001;
+                  $rate := $res = "4k"    ? $rate4k :
+                           $res = "1080p" ? $rate1080 :
                            $res = "720p"  ? $rate720 :
                                             $rate480;
                   $cost := $dur * $rate * $pricePer1K / 1000;
@@ -1664,7 +1711,7 @@ class ByteDance2TextToVideoNode(IO.ComfyNode):
             ApiEndpoint(path=f"{BYTEPLUS_SEEDANCE2_TASK_STATUS_ENDPOINT}/{initial_response.id}"),
             response_model=TaskStatusResponse,
             status_extractor=lambda r: r.status,
-            price_extractor=_seedance2_price_extractor(model_id, has_video_input=False),
+            price_extractor=_seedance2_price_extractor(model_id, has_video_input=False, resolution=model["resolution"]),
             poll_interval=9,
         )
         return IO.NodeOutput(await download_url_to_video_output(response.content.video_url))
@@ -1677,7 +1724,7 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDance2FirstLastFrameNode",
             display_name="ByteDance Seedance 2.0 First-Last-Frame to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate video using Seedance 2.0 from a first frame image and optional last frame image.",
             inputs=[
                 IO.DynamicCombo.Input(
@@ -1685,14 +1732,19 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
                     options=[
                         IO.DynamicCombo.Option(
                             "Seedance 2.0",
-                            _seedance2_text_inputs(["480p", "720p", "1080p"], default_ratio="adaptive"),
+                            _seedance2_text_inputs(["480p", "720p", "1080p", "4k"], default_ratio="adaptive"),
                         ),
                         IO.DynamicCombo.Option(
                             "Seedance 2.0 Fast",
                             _seedance2_text_inputs(["480p", "720p"], default_ratio="adaptive"),
                         ),
+                        IO.DynamicCombo.Option(
+                            "Seedance 2.0 Mini",
+                            _seedance2_text_inputs(["480p", "720p"], default_ratio="adaptive"),
+                        ),
                     ],
-                    tooltip="Seedance 2.0 for maximum quality; Seedance 2.0 Fast for speed optimization.",
+                    tooltip="Seedance 2.0 for maximum quality; Fast for speed optimization; "
+                    "Mini for the fastest, lowest-cost generation.",
                 ),
                 IO.Image.Input(
                     "first_frame",
@@ -1752,11 +1804,16 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
                   $rate480 := 10044;
                   $rate720 := 21600;
                   $rate1080 := 48800;
+                  $rate4k := 195200;
                   $m := widgets.model;
-                  $pricePer1K := $contains($m, "fast") ? 0.008008 : 0.01001;
                   $res := $lookup(widgets, "model.resolution");
                   $dur := $lookup(widgets, "model.duration");
-                  $rate := $res = "1080p" ? $rate1080 :
+                  $pricePer1K := $res = "4k"    ? 0.00572 :
+                                 $res = "1080p" ? 0.011011 :
+                                 $contains($m, "mini") ? 0.005005 :
+                                 $contains($m, "fast") ? 0.008008 : 0.01001;
+                  $rate := $res = "4k"    ? $rate4k :
+                           $res = "1080p" ? $rate1080 :
                            $res = "720p"  ? $rate720 :
                                             $rate480;
                   $cost := $dur * $rate * $pricePer1K / 1000;
@@ -1790,10 +1847,28 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
         if last_frame is not None and last_frame_asset_id:
             raise ValueError("Provide only one of last_frame or last_frame_asset_id, not both.")
 
-        if first_frame is not None:
-            first_frame = _prepare_seedance_image(first_frame)
-        if last_frame is not None:
-            last_frame = _prepare_seedance_image(last_frame)
+        request_ratio = model["ratio"]
+        if first_frame_asset_id or last_frame_asset_id:
+            if first_frame is not None:
+                first_frame = _prepare_seedance_image(first_frame)
+            if last_frame is not None:
+                last_frame = _prepare_seedance_image(last_frame)
+        else:
+            # The 1080p FLF stretch fix (pre-size frames to a supported pixel pair + submit ratio="adaptive")
+            # only applies to local image inputs we can resize.
+            request_ratio = "adaptive"
+            target_dims: tuple[int, int] | None = None
+            if first_frame is not None:
+                validate_image_aspect_ratio(first_frame, (2, 5), (5, 2), strict=False)  # 0.4 to 2.5
+                validate_image_dimensions(first_frame, min_width=300, min_height=300)
+                target_dims = _seedance2_target_dims(model["resolution"], model["ratio"], first_frame)
+                first_frame = _resize_to_exact(first_frame, *target_dims)
+            if last_frame is not None:
+                validate_image_aspect_ratio(last_frame, (2, 5), (5, 2), strict=False)  # 0.4 to 2.5
+                validate_image_dimensions(last_frame, min_width=300, min_height=300)
+                if target_dims is None:
+                    target_dims = _seedance2_target_dims(model["resolution"], model["ratio"], last_frame)
+                last_frame = _resize_to_exact(last_frame, *target_dims)
 
         asset_ids_to_resolve = [a for a in (first_frame_asset_id, last_frame_asset_id) if a]
         image_assets: dict[str, str] = {}
@@ -1844,7 +1919,7 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
                 content=content,
                 generate_audio=model["generate_audio"],
                 resolution=model["resolution"],
-                ratio=model["ratio"],
+                ratio=request_ratio,
                 duration=model["duration"],
                 seed=seed,
                 watermark=watermark,
@@ -1856,7 +1931,7 @@ class ByteDance2FirstLastFrameNode(IO.ComfyNode):
             ApiEndpoint(path=f"{BYTEPLUS_SEEDANCE2_TASK_STATUS_ENDPOINT}/{initial_response.id}"),
             response_model=TaskStatusResponse,
             status_extractor=lambda r: r.status,
-            price_extractor=_seedance2_price_extractor(model_id, has_video_input=False),
+            price_extractor=_seedance2_price_extractor(model_id, has_video_input=False, resolution=model["resolution"]),
             poll_interval=9,
         )
         return IO.NodeOutput(await download_url_to_video_output(response.content.video_url))
@@ -1944,7 +2019,7 @@ class ByteDance2ReferenceNode(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDance2ReferenceNode",
             display_name="ByteDance Seedance 2.0 Reference to Video",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description="Generate, edit, or extend video using Seedance 2.0 with reference images, "
             "videos, and audio. Supports multimodal reference, video editing, and video extension.",
             inputs=[
@@ -1953,14 +2028,19 @@ class ByteDance2ReferenceNode(IO.ComfyNode):
                     options=[
                         IO.DynamicCombo.Option(
                             "Seedance 2.0",
-                            _seedance2_reference_inputs(["480p", "720p", "1080p"], default_ratio="adaptive"),
+                            _seedance2_reference_inputs(["480p", "720p", "1080p", "4k"], default_ratio="adaptive"),
                         ),
                         IO.DynamicCombo.Option(
                             "Seedance 2.0 Fast",
                             _seedance2_reference_inputs(["480p", "720p"], default_ratio="adaptive"),
                         ),
+                        IO.DynamicCombo.Option(
+                            "Seedance 2.0 Mini",
+                            _seedance2_reference_inputs(["480p", "720p"], default_ratio="adaptive"),
+                        ),
                     ],
-                    tooltip="Seedance 2.0 for maximum quality; Seedance 2.0 Fast for speed optimization.",
+                    tooltip="Seedance 2.0 for maximum quality; Fast for speed optimization; "
+                    "Mini for the fastest, lowest-cost generation.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1999,13 +2079,21 @@ class ByteDance2ReferenceNode(IO.ComfyNode):
                   $rate480 := 10044;
                   $rate720 := 21600;
                   $rate1080 := 48800;
+                  $rate4k := 195200;
                   $m := widgets.model;
                   $hasVideo := $lookup(inputGroups, "model.reference_videos") > 0;
-                  $noVideoPricePer1K := $contains($m, "fast") ? 0.008008 : 0.01001;
-                  $videoPricePer1K := $contains($m, "fast") ? 0.004719 : 0.006149;
                   $res := $lookup(widgets, "model.resolution");
                   $dur := $lookup(widgets, "model.duration");
-                  $rate := $res = "1080p" ? $rate1080 :
+                  $noVideoPricePer1K := $res = "4k"    ? 0.00572 :
+                                        $res = "1080p" ? 0.011011 :
+                                        $contains($m, "mini") ? 0.005005 :
+                                        $contains($m, "fast") ? 0.008008 : 0.01001;
+                  $videoPricePer1K := $res = "4k"    ? 0.003432 :
+                                      $res = "1080p" ? 0.006721 :
+                                      $contains($m, "mini") ? 0.003003 :
+                                      $contains($m, "fast") ? 0.004719 : 0.006149;
+                  $rate := $res = "4k"    ? $rate4k :
+                           $res = "1080p" ? $rate1080 :
                            $res = "720p"  ? $rate720 :
                                             $rate480;
                   $noVideoCost := $dur * $rate * $noVideoPricePer1K / 1000;
@@ -2201,7 +2289,9 @@ class ByteDance2ReferenceNode(IO.ComfyNode):
             ApiEndpoint(path=f"{BYTEPLUS_SEEDANCE2_TASK_STATUS_ENDPOINT}/{initial_response.id}"),
             response_model=TaskStatusResponse,
             status_extractor=lambda r: r.status,
-            price_extractor=_seedance2_price_extractor(model_id, has_video_input=has_video_input),
+            price_extractor=_seedance2_price_extractor(
+                model_id, has_video_input=has_video_input, resolution=model["resolution"]
+            ),
             poll_interval=9,
         )
         return IO.NodeOutput(await download_url_to_video_output(response.content.video_url))
@@ -2241,7 +2331,7 @@ class ByteDanceCreateImageAsset(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceCreateImageAsset",
             display_name="ByteDance Create Image Asset",
-            category="image/partner/ByteDance",
+            category="partner/image/ByteDance",
             description=(
                 "Create a Seedance 2.0 personal image asset. Uploads the input image and "
                 "registers it in the given asset group. If group_id is empty, runs a real-person "
@@ -2308,7 +2398,7 @@ class ByteDanceCreateVideoAsset(IO.ComfyNode):
         return IO.Schema(
             node_id="ByteDanceCreateVideoAsset",
             display_name="ByteDance Create Video Asset",
-            category="video/partner/ByteDance",
+            category="partner/video/ByteDance",
             description=(
                 "Create a Seedance 2.0 personal video asset. Uploads the input video and "
                 "registers it in the given asset group. If group_id is empty, runs a real-person "
