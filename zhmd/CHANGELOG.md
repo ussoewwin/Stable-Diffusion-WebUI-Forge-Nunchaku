@@ -26,6 +26,7 @@
 ## Version 1.7.5
 
 - **ADetailer（内置扩展）：** 人脸检测不再使用 InsightFace（仅 YOLO）。
+  - 详情请参阅 [Release Notes（中文）](v1.7.5.md)。
 
 ## Version 1.7.4
 
