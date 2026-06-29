@@ -17,6 +17,7 @@ class Anima(ForgeDiffusionEngine):
 
     def __init__(self, estimated_config, huggingface_components):
         super().__init__(estimated_config, huggingface_components)
+        self.is_inpaint = False
 
         clip = huggingface_components["text_encoder"]
 
