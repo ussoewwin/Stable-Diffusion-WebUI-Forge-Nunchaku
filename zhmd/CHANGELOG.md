@@ -81,7 +81,7 @@
 - **ComfyUI-master 更新与 comfy_aimdo 兼容性修复**
   - 通过创建 `vram_buffer.py`（`VRAMBuffer` 类）并扩展 `control.py`（`init_devices` 方法）更新 `comfy_aimdo` stub 包，确保与更新后的 ComfyUI-master 启动序列兼容，无需专有 AIMDO 库。
   - 修复启动时的 `ModuleNotFoundError: No module named 'comfy_aimdo.vram_buffer'`。
-  - 在 `docs/aimdo_compatibility_fix_report.md` 下添加文档，详述错误 traceback、根本原因和修改说明。
+  - 发行说明详述错误 traceback、根本原因和修改说明。
   - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.6.0)。
 
 ## Version 1.5.1
@@ -113,7 +113,7 @@
 - **ComfyUI-master 0.19.3 同步与 AIMDO 导入兼容性**
   - 更新 bundled `ComfyUI-master` 树以匹配 ComfyUI 0.19.3；上游现在在启动时导入可选 AIMDO 模块（`comfy_aimdo.*`）。
   - 扩展仓库 `comfy_aimdo` stub 包（根目录和 `ComfyUI-master/comfy_aimdo/`），添加 `host_buffer`、`model_mmap` 及相关 API，使 Forge 无需真实 AIMDO wheel 即可启动；Forge 继续使用自己的 loader 和内存路径。
-  - 添加 `docs/comfyui_master_0_19_3_error_analysis.md`（英文）：根本原因、完整 traceback、导入流程序列图和文件级说明。
+  - 发行说明（英文）涵盖根本原因、完整 traceback、导入流程序列图和文件级说明。
   - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.4.8)。
 
 ## Version 1.4.7
@@ -128,7 +128,7 @@
 
 - **Qwen-Image-2512-Fun-Controlnet-Union 支持**
   - 原生支持 Qwen Image Fun ControlNet（例如 Qwen-Image-2512-Fun-Controlnet、Union 变体）。使用 ComfyUI 的 `QwenImageFunControlNetModel`；通过每步 wrapper 注入到 `c["control"]`，适用于 Nunchaku 和标准 Qwen Image backend。
-  - 控制图像使用 Forge VAE 编码并作为 raw latent 传递；注入前应用 strength。实现指南见 `docs/qwen_fun_controlnet_implementation_guide.md`。
+  - 控制图像使用 Forge VAE 编码并作为 raw latent 传递；注入前应用 strength。实现细节见发行说明。
   - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.5)。
 
 ## Version 1.4.4

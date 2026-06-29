@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build bilingual v1.7.0 release notes from docs/ANIMA_IMPLEMENTATION_GUIDE.md."""
+"""Maintainer script: regenerate v1.7.0 release files from local (untracked) docs/ANIMA_IMPLEMENTATION_GUIDE.md."""
 
 from __future__ import annotations
 

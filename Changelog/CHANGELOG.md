@@ -81,7 +81,7 @@
 - **ComfyUI-master update and comfy_aimdo compatibility fixes**
   - Updated the stub packages of `comfy_aimdo` by creating `vram_buffer.py` (`VRAMBuffer` class) and extending `control.py` (`init_devices` method) to ensure compatibility with updated ComfyUI-master startup sequences without the proprietary AIMDO library.
   - Resolved `ModuleNotFoundError: No module named 'comfy_aimdo.vram_buffer'` during startup.
-  - Added documentation under `docs/aimdo_compatibility_fix_report.md` detailing error traceback, root cause, and explanation of modifications.
+  - Release notes detail error traceback, root cause, and explanation of modifications.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.6.0) for details.
 
 ## Version 1.5.1
@@ -114,7 +114,7 @@
 - **ComfyUI-master 0.19.3 sync and AIMDO import compatibility**
   - Updated the bundled `ComfyUI-master` tree to match ComfyUI 0.19.3; upstream now imports optional AIMDO modules (`comfy_aimdo.*`) during startup.
   - Extended the repository `comfy_aimdo` stub package (root and `ComfyUI-master/comfy_aimdo/`) with `host_buffer`, `model_mmap`, and related APIs so Forge starts without the real AIMDO wheel; Forge continues to use its own loader and memory paths.
-  - Added `docs/comfyui_master_0_19_3_error_analysis.md` (English): root cause, full traceback, import-flow sequence diagrams, and file-level notes.
+  - Release notes (English) cover root cause, full traceback, import-flow sequence diagrams, and file-level notes.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.4.8) for details.
 
 ## Version 1.4.7
@@ -129,7 +129,7 @@
 
 - **Qwen-Image-2512-Fun-Controlnet-Union support**
   - Native support for Qwen Image Fun ControlNet (e.g. Qwen-Image-2512-Fun-Controlnet, Union variants). Uses ComfyUI's `QwenImageFunControlNetModel`; injects control via per-step wrapper into `c["control"]` for Nunchaku and standard Qwen Image backends.
-  - Control image is encoded with Forge VAE and passed as raw latent; strength is applied before injection. Implementation guide in `docs/qwen_fun_controlnet_implementation_guide.md`.
+  - Control image is encoded with Forge VAE and passed as raw latent; strength is applied before injection. See Release Notes for implementation details.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/1.4.5) for details.
 
 ## Version 1.4.4
