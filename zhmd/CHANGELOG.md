@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.7.7
+
+- **Anima + ADetailer：img2img inpaint 标志修复**
+  - **`Anima`** 引擎加载后将 **`is_inpaint = False`**，避免在 Wan **5D** latent 上走 WebUI SD 风格的 latent mask/图像 concat。
+  - 修复主 txt2img 成功后 ADetailer 后处理 **`AnimaWai68`** checkpoint（如 **`waiANIMA_pw3.safetensors`**）时出现的 **`RuntimeError: Tensors must have same number of dimensions: got 4 and 5`**；区域 mask 仍通过 img2img **`sample()`** 中已有的 **5D** mask blend 生效。
+  - 变更仅限 **`backend/diffusion_engine/anima.py`**（与 Qwen / Flux / Lumina 相同做法），其他模型不受影响。提交 **`9c85472`**。
+  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.7)。
+
 ## Version 1.7.6
 
 - **IoPaint 启动脚本修复：**
