@@ -21,6 +21,7 @@
   - Changed default port for IOPaint to **`8081`** to avoid conflicts with ComfyUI's `AiHelper` (which uses `8080`).
   - Implemented a readiness check in `iopaint-cuda.bat` using PowerShell to wait for IOPaint's `/api/v1/server-config` endpoint to return HTTP 200 before launching the browser.
   - Corrected the working directory (`cd`) in `iopaint-cuda.bat` to ensure proper execution.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.6) for details.
 
 ## Version 1.7.5
 

@@ -21,6 +21,7 @@
   - 将 IOPaint 默认端口改为 **`8081`**，避免与 ComfyUI 的 `AiHelper`（占用 `8080`）冲突。
   - 在 `iopaint-cuda.bat` 中增加就绪检测：使用 PowerShell 轮询 `/api/v1/server-config`，返回 HTTP 200 后再打开浏览器。
   - 修正 `iopaint-cuda.bat` 的工作目录（`cd`），确保在正确路径下启动。
+  - 详情请参阅 [Release Notes（中文）](v1.7.6.md)。
 
 ## Version 1.7.5
 
