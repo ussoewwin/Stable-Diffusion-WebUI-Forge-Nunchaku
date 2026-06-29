@@ -14,6 +14,12 @@
   - Implemented a readiness check in `iopaint-cuda.bat` using PowerShell to wait for IOPaint's `/api/v1/server-config` endpoint to return HTTP 200 before launching the browser.
   - Corrected the working directory (`cd`) in `iopaint-cuda.bat` to ensure proper execution.
 
+- **Anima + ADetailer: img2img inpaint flag fix**
+  - **`Anima`** engine sets **`is_inpaint = False`** after load so WebUI SD-style latent mask/image concat is not used on Wan **5D** latents.
+  - Fixes **`RuntimeError: Tensors must have same number of dimensions: got 4 and 5`** when ADetailer post-processes **`AnimaWai68`** checkpoints (e.g. **`waiANIMA_pw3.safetensors`**) after main txt2img; regional masks still apply via existing **5D** mask blend in img2img **`sample()`**.
+  - Change is scoped to **`backend/diffusion_engine/anima.py`** only (same pattern as Qwen / Flux / Lumina); other models unchanged. Commit **`9c85472`**.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.6) for details.
+
 ## Version 1.7.5
 
 - **ADetailer (built-in extension):** Face detection no longer uses InsightFace (YOLO only).
