@@ -201,6 +201,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)** - MIT
-- https://github.com/ClownsharkBatwing/RES4LYF?tab=License-1-ov-file — **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF)** - AGPL-3.0 - Commercial AI image generation service use requires separate permission and/or a commercial license from the copyright holder.
+- **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF?tab=License-1-ov-file)** - AGPL-3.0 - Commercial AI image generation service use requires separate permission and/or a commercial license from the copyright holder.
 
 See [LICENSE](LICENSE) file for details.
