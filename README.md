@@ -181,6 +181,9 @@ This project is built upon the following repositories:
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)**  
   Source reference for the built-in aspect ratio calculator logic adaptation by [@gseth](https://github.com/gseth)
 
+- **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF)**  
+  RES/Bongmath samplers and schedulers by [@ClownsharkBatwing](https://github.com/ClownsharkBatwing)
+
 ## License
 
 This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
@@ -198,7 +201,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)** - MIT
-- **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF)** — AGPL-3.0 — ComfyUI custom node for advanced RES/Bongmath samplers and schedulers.
-- [RES4LYF License](https://github.com/ClownsharkBatwing/RES4LYF?tab=License-1-ov-file)
+- https://github.com/ClownsharkBatwing/RES4LYF?tab=License-1-ov-file — **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF)** - AGPL-3.0 - Commercial AI image generation service use requires separate permission and/or a commercial license from the copyright holder.
 
 See [LICENSE](LICENSE) file for details.
