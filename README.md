@@ -198,5 +198,6 @@ This project is built upon the following repositories, each with their respectiv
 - **[Config-Presets](https://github.com/Zyin055/Config-Presets)** - MIT
 - **[stable-diffusion-webui-wd14-tagger](https://github.com/picobyte/stable-diffusion-webui-wd14-tagger)** - Public domain, except borrowed parts (e.g. dbimutils.py)
 - **[ControlAltAI-Nodes](https://github.com/gseth/ControlAltAI-Nodes)** - MIT
+- **[RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF)** — AGPL-3.0 — ComfyUI custom node for advanced RES/Bongmath samplers and schedulers.
 
 See [LICENSE](LICENSE) file for details.
