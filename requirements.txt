@@ -3,12 +3,12 @@ Pillow==12.2.0
 pillow-jxl-plugin
 accelerate==1.13.0
 blendmodes==2025
-numpy==2.4.4
+numpy==2.5.1
 clean-fid==0.1.35
 diffusers==0.38.0
 diskcache==5.6.3
 einops==0.8.1
-facexlib==0.3.0
+# facexlib==0.3.0  # omitted: numba 0.66 rejects numpy>=2.5 at import; GFPGAN/CodeFormer face helper unavailable until numba supports 2.5
 fastapi==0.112.4
 httpcore==0.15.0
 httpx==0.24.1
@@ -57,7 +57,7 @@ torch
 python-socketio
 typer-config
 loguru
-rembg
+# rembg  # omitted: pymatting->numba rejects numpy>=2.5; reinstall when numba supports 2.5
 # WD14-tagger (builtin)
 deepdanbooru
 jsonschema

@@ -306,7 +306,7 @@ def requirements_met(requirements_file):
 
 def prepare_environment():
     torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu130")
-    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.11.0+cu130 torchvision==0.26.0+cu130 --extra-index-url {torch_index_url}")
+    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.11.0+cu130 torchvision==0.26.0+cu130 torchaudio==2.11.0+cu130 --extra-index-url {torch_index_url}")
     xformers_package = os.environ.get("XFORMERS_PACKAGE", f"xformers==0.0.33.post2 --extra-index-url {torch_index_url}")
     bnb_package = os.environ.get("BNB_PACKAGE", "bitsandbytes==0.48.2")
 
@@ -332,8 +332,8 @@ def prepare_environment():
     print(f"Python {sys.version}")
     print(f"Version: {tag}")
 
-    if args.reinstall_torch or not is_installed("torch") or not is_installed("torchvision"):
-        run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
+    if args.reinstall_torch or not is_installed("torch") or not is_installed("torchvision") or not is_installed("torchaudio"):
+        run(f'"{python}" -m {torch_command}', "Installing torch, torchvision and torchaudio", "Couldn't install torch", live=True)
         startup_timer.record("install torch")
 
     if not args.skip_torch_cuda_test:
