@@ -1736,9 +1736,10 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             _, C, H, W = samples.shape
 
         # Tile size in latent space. 1024px / 8 = 128. Use 128 with padding.
-        tile_latent = 128
+        tile_latent = 96
         # Padding in latent space (overlap between tiles). Larger = smoother seams.
-        pad_latent = 32
+        # With tile=96 and pad=48, overlap ratio is 50%.
+        pad_latent = 48
 
         # If the image is small enough to fit in a single tile, fall back to
         # the default single-pass path.
@@ -1909,9 +1910,182 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             out_samples = out_samples / weight_mask
 
         _hrlog(f"Anima tiled: done out_shape={tuple(out_samples.shape)}")
+
+        # ------------------------------------------------------------------
+        # Seam fix pass: run a narrow img2img along each tile boundary to
+        # smooth residual discontinuities. Mirrors ComfyUI USDU seam fix.
+        # ------------------------------------------------------------------
+        out_samples = self._anima_seam_fix(
+            out_samples, image_conditioning, H, W, is_5d,
+            tile_latent, pad_latent, n_tiles_x, n_tiles_y, _hrlog
+        )
+
         self.sampler = None
         devices.torch_gc()
         return out_samples
+
+    def _anima_seam_fix(self, samples, image_conditioning, H, W, is_5d,
+                        tile_latent, pad_latent, n_tiles_x, n_tiles_y, _hrlog):
+        """
+        Seam fix pass: run a narrow img2img strip along each tile boundary
+        with low denoising to smooth residual discontinuities.
+        Mirrors ComfyUI USDU's seam fix (band-pass mode).
+        """
+        import math
+
+        # No seams if only one tile in a dimension
+        if n_tiles_x <= 1 and n_tiles_y <= 1:
+            return samples
+
+        # Seam strip half-width in latent space (total width = 2 * seam_half)
+        seam_half = max(8, pad_latent // 2)
+
+        # Collect seam regions (horizontal and vertical boundaries)
+        seams = []  # list of (y0, y1, x0, x1)
+
+        # Horizontal seams (between tile rows)
+        for ty in range(1, n_tiles_y):
+            cy = ty * tile_latent
+            if cy >= H:
+                continue
+            y0s = max(0, cy - seam_half)
+            y1s = min(H, cy + seam_half)
+            seams.append((y0s, y1s, 0, W, "H", ty))
+
+        # Vertical seams (between tile cols)
+        for tx in range(1, n_tiles_x):
+            cx = tx * tile_latent
+            if cx >= W:
+                continue
+            x0s = max(0, cx - seam_half)
+            x1s = min(W, cx + seam_half)
+            seams.append((0, H, x0s, x1s, "V", tx))
+
+        if not seams:
+            return samples
+
+        _hrlog(f"Anima seam fix: {len(seams)} seams, seam_half={seam_half}")
+
+        # Use lower denoising for seam fix (half of current denoising_strength)
+        orig_denoise = getattr(self, 'denoising_strength', 0.7)
+        seam_denoise = max(0.05, orig_denoise * 0.5)
+        _hrlog(f"Anima seam fix: orig_denoise={orig_denoise} seam_denoise={seam_denoise}")
+
+        # Save and override denoising_strength
+        self.denoising_strength = seam_denoise
+
+        for idx, (y0s, y1s, x0s, x1s, orient, grid_idx) in enumerate(seams):
+            if shared.state.interrupted:
+                _hrlog("Anima seam fix: interrupted")
+                break
+
+            sh = y1s - y0s
+            sw = x1s - x0s
+            _hrlog(
+                f"Anima seam fix: seam {idx+1}/{len(seams)} "
+                f"{orient}{grid_idx} roi=({y0s}:{y1s},{x0s}:{x1s}) "
+                f"size={sh}x{sw}"
+            )
+
+            # Extract seam region
+            if is_5d:
+                seam_lat = samples[:, :, :, y0s:y1s, x0s:x1s].to(shared.device)
+            else:
+                seam_lat = samples[:, :, y0s:y1s, x0s:x1s].to(shared.device)
+
+            # Tile image_conditioning if spatial
+            seam_ic = image_conditioning
+            if image_conditioning is not None and len(image_conditioning.shape) >= 4:
+                ic_h = image_conditioning.shape[-2]
+                ic_w = image_conditioning.shape[-1]
+                if ic_h > 1 and ic_w > 1:
+                    ic_y0 = (y0s * ic_h) // H
+                    ic_y1 = (y1s * ic_h) // H
+                    ic_x0 = (x0s * ic_w) // W
+                    ic_x1 = (x1s * ic_w) // W
+                    seam_ic = image_conditioning[..., ic_y0:ic_y1, ic_x0:ic_x1]
+
+            # Per-seam RNG
+            base_seed = int(self.seeds[0]) if self.seeds else 0
+            seam_seed = (base_seed + (idx + 1000) * 2654435761) & 0xFFFFFFFF
+            seam_rng = rng.ImageRNG(
+                seam_lat.shape[1:],
+                [seam_seed],
+                subseeds=self.subseeds,
+                subseed_strength=self.subseed_strength,
+                seed_resize_from_h=self.seed_resize_from_h,
+                seed_resize_from_w=self.seed_resize_from_w,
+            )
+            seam_noise = seam_rng.next()
+
+            if self.scripts is not None:
+                self.scripts.process_before_every_sampling(
+                    p=self,
+                    x=seam_lat,
+                    noise=seam_noise,
+                    c=self.hr_c,
+                    uc=self.hr_uc,
+                )
+
+            try:
+                # Recreate sampler for seam fix (it was set to None after tiling)
+                if self.sampler is None:
+                    self.sampler = sd_samplers.create_sampler(self.sampler_name, self.sd_model)
+
+                seam_out = self.sampler.sample_img2img(
+                    self,
+                    seam_lat,
+                    seam_noise,
+                    self.hr_c,
+                    self.hr_uc,
+                    steps=self.hr_second_pass_steps or self.steps,
+                    image_conditioning=seam_ic,
+                )
+            except Exception as e:
+                _hrlog(f"Anima seam fix: seam {idx+1} failed: {e}")
+                seam_out = seam_lat
+
+            seam_out = seam_out.to(devices.cpu)
+
+            # Blend seam result back with a Gaussian weight centered on the seam line
+            if orient == "H":
+                # Horizontal seam: weight peaks at cy, falls off vertically
+                cy = grid_idx * tile_latent
+                rel_cy = cy - y0s  # center relative to strip
+                w = torch.ones(sh, dtype=torch.float32, device=devices.cpu)
+                sigma = seam_half / 2.0
+                for i in range(sh):
+                    d = abs(i - rel_cy)
+                    w[i] = float(torch.exp(torch.tensor(-0.5 * (d / max(sigma, 1e-6)) ** 2)))
+                # Expand to 2D
+                w2d = w[:, None] * torch.ones(sw, dtype=torch.float32, device=devices.cpu)[None, :]
+            else:
+                # Vertical seam: weight peaks at cx, falls off horizontally
+                cx = grid_idx * tile_latent
+                rel_cx = cx - x0s
+                w = torch.ones(sw, dtype=torch.float32, device=devices.cpu)
+                sigma = seam_half / 2.0
+                for i in range(sw):
+                    d = abs(i - rel_cx)
+                    w[i] = float(torch.exp(torch.tensor(-0.5 * (d / max(sigma, 1e-6)) ** 2)))
+                w2d = torch.ones(sh, dtype=torch.float32, device=devices.cpu)[:, None] * w[None, :]
+
+            # Blend: original * (1 - w) + seam_out * w
+            if is_5d:
+                orig_region = samples[:, :, :, y0s:y1s, x0s:x1s]
+                blended = orig_region * (1 - w2d[None, None, None, :, :]) + seam_out * w2d[None, None, None, :, :]
+                samples[:, :, :, y0s:y1s, x0s:x1s] = blended
+            else:
+                orig_region = samples[:, :, y0s:y1s, x0s:x1s]
+                blended = orig_region * (1 - w2d[None, None, :, :]) + seam_out * w2d[None, None, :, :]
+                samples[:, :, y0s:y1s, x0s:x1s] = blended
+
+            devices.torch_gc()
+
+        # Restore original denoising_strength
+        self.denoising_strength = orig_denoise
+        _hrlog(f"Anima seam fix: done")
+        return samples
 
     def _anima_single_img2img(self, samples, image_conditioning, _hrlog):
         """Fallback single-pass img2img for Anima when image fits in one tile."""
