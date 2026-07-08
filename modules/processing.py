@@ -1737,8 +1737,8 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
 
         # Tile size in latent space. 1024px / 8 = 128. Use 128 with padding.
         tile_latent = 128
-        # Padding in latent space (overlap between tiles)
-        pad_latent = 16
+        # Padding in latent space (overlap between tiles). Larger = smoother seams.
+        pad_latent = 32
 
         # If the image is small enough to fit in a single tile, fall back to
         # the default single-pass path.
@@ -1866,22 +1866,31 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
 
                 tile_out = tile_out.to(devices.cpu)
 
-                # Compute blend weights for this tile (linear ramp in padding zone)
+                # Compute blend weights for this tile (Gaussian falloff in padding zone)
                 th = y1 - y0
                 tw = x1 - x0
-                w = torch.ones((th, tw), dtype=torch.float32, device=devices.cpu)
-                # Apply linear ramp in padded regions
-                if pad_latent > 0:
-                    for i in range(pad_latent):
-                        v = (i + 1) / (pad_latent + 1)
-                        if y0 > 0:
-                            w[i, :] = torch.clamp(w[i, :], max=v)
-                        if y1 < H:
-                            w[th - 1 - i, :] = torch.clamp(w[th - 1 - i, :], max=v)
-                        if x0 > 0:
-                            w[:, i] = torch.clamp(w[:, i], max=v)
-                        if x1 < W:
-                            w[:, tw - 1 - i] = torch.clamp(w[:, tw - 1 - i], max=v)
+
+                # Build a 2D Gaussian-like weight centered on the tile core.
+                # Core (non-padded) region gets weight 1.0; padded regions get
+                # a smooth Gaussian falloff to eliminate visible seams.
+                def _gauss_ramp(n, pad, left_pad, right_pad):
+                    """1D weight vector of length n with Gaussian falloff in padded zones."""
+                    v = torch.ones(n, dtype=torch.float32, device=devices.cpu)
+                    if pad > 0:
+                        sigma = pad / 2.5  # ~2.5 sigma across the pad
+                        for i in range(pad):
+                            # Gaussian: exp(-0.5 * ((d/sigma)^2))
+                            d = (pad - i)  # distance from core edge
+                            gv = float(torch.exp(torch.tensor(-0.5 * (d / sigma) ** 2)))
+                            if left_pad:
+                                v[i] = gv
+                            if right_pad:
+                                v[n - 1 - i] = gv
+                    return v
+
+                wy = _gauss_ramp(th, pad_latent, y0 > 0, y1 < H)
+                wx = _gauss_ramp(tw, pad_latent, x0 > 0, x1 < W)
+                w = wy[:, None] * wx[None, :]  # (th, tw)
 
                 # Accumulate
                 if is_5d:
