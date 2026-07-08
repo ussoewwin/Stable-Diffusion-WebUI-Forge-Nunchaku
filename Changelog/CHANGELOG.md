@@ -7,6 +7,16 @@
   </tr>
 </table>
 
+## Version 1.7.9
+
+- **Anima Hires Fix: tiled second pass for high-resolution upscale**
+  - On the pixel-upscale Hires path, **Anima-only** detection (`anima` in checkpoint name) routes large upscaled latents through **tiled img2img** instead of a single full-image pass, mirroring ComfyUI USDU and keeping each tile within Anima’s training resolution (~1024-class).
+  - **96×96 latent tiles** with **50% overlap** (`pad_latent=48`), **Gaussian blend** stitching, and a **seam-fix pass** (narrow boundary strips at half denoising strength).
+  - **Anima-only** dynamic VAE decode normalization before pixel upscaling; **5D decoded latent** normalization and **5D truncate** cropping on the shared Hires path.
+  - Hires **sigma schedule** aligned with ComfyUI for Anima img2img. Non-Anima models and **latent-upscale** Hires unchanged aside from v1.7.8 5D helpers.
+  - Scoped to **`modules/processing.py`**; SD 1.5 / SDXL / Flux / Wan behavior on latent-upscale Hires is unchanged.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.9) for details.
+
 ## Version 1.7.8
 
 - **Hires Fix: 5D tensor compatibility for video/DiT models (Wan / Flux)**

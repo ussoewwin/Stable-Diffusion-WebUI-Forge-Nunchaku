@@ -7,6 +7,16 @@
   </tr>
 </table>
 
+## Version 1.7.9
+
+- **Anima Hires Fix：高分辨率放大时的分块二次采样**
+  - 在**像素放大** Hires 路径上，仅当 checkpoint 名含 **`anima`** 时，将放大后的 latent 走**分块 img2img**（对标 ComfyUI USDU），避免单次全图 img2img 在超出 Anima 训练分辨率时噪声化、画面崩坏。
+  - **96×96 latent 分块**、**50% 重叠**（`pad_latent=48`）、**高斯权重融合**拼接，并对瓦片边界做**接缝修复**（窄条带、约一半 denoising strength）。
+  - **仅 Anima**：VAE 解码后动态 min/max 归一化；共用路径上支持 **5D 解码张量**归一化与 **5D truncate** 裁剪。
+  - Anima Hires **sigma 调度**与 ComfyUI 对齐。非 Anima 及 **latent 放大** Hires 不变（v1.7.8 的 5D 辅助逻辑除外）。
+  - 变更限于 **`modules/processing.py`**。
+  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.9)。
+
 ## Version 1.7.8
 
 - **Hires Fix：对视频/DiT模型（Wan / Flux）的 5D 张量兼容性支持**
