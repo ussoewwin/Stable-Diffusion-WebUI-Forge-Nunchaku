@@ -1573,7 +1573,20 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
                     decoded_samples = decoded_samples[:, 0]
                 _hrlog(f"decoded post-normalize shape={tuple(decoded_samples.shape)}")
 
-            lowres_samples = torch.clamp((decoded_samples + 1.0) / 2.0, min=0.0, max=1.0)
+            if is_anima:
+                # Anima: dynamic min/max normalization (ComfyUI _to_fp32_image equivalent)
+                # Nunchaku SDXL VAE decode output can be a narrow range (e.g. [0.15, 0.85])
+                # instead of [-1, 1]. Stretch it to [0, 1] before pixel upscaling.
+                min_val = decoded_samples.min().item()
+                max_val = decoded_samples.max().item()
+                _hrlog(f"Anima decoded range min={min_val:.6f} max={max_val:.6f}")
+                if max_val > min_val:
+                    lowres_samples = (decoded_samples - min_val) / (max_val - min_val)
+                else:
+                    lowres_samples = torch.zeros_like(decoded_samples)
+                lowres_samples = torch.clamp(lowres_samples, min=0.0, max=1.0)
+            else:
+                lowres_samples = torch.clamp((decoded_samples + 1.0) / 2.0, min=0.0, max=1.0)
             _hrlog(f"lowres_samples shape={tuple(lowres_samples.shape)}")
 
             batch_images = []
