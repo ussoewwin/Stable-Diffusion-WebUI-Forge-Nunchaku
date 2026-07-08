@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.7.8
+
+- **Hires Fix: 5D tensor compatibility for video/DiT models (Wan / Flux)**
+  - Fixed **`ValueError: Input and output must have the same number of spatial dimensions`** during latent-space upscale by locally squeezing/unsqueezing the extra temporal dimension (dim 2) of 5D latents `(N, C, 1, H, W)` around `torch.nn.functional.interpolate`.
+  - Fixed **`TypeError: Cannot handle this data type: (1, 1, 1, 1024)`** during pixel-space upscale by squeezing the extra temporal dimension (dim 1) of 5D VAE-decoded outputs `(N, 1, C, H, W)` before processing with NumPy/PIL.
+  - Squeezing logic is scoped strictly to 5D tensors; standard 4D latent models (SD 1.5, SDXL, anime models) bypass these blocks entirely and remain unaffected.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.8) for details.
+
 ## Version 1.7.7
 
 - **Anima + ADetailer: img2img inpaint flag fix**
