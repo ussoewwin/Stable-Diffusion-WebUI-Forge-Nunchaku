@@ -1483,6 +1483,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             return samples
 
         self.is_hr_pass = True
+
         target_width = self.hr_upscale_to_x
         target_height = self.hr_upscale_to_y
 
@@ -1506,7 +1507,15 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             for i in range(samples.shape[0]):
                 save_intermediate(samples, i)
 
+            # Some models (e.g. Flux/Wan) produce 5D latents (N, C, 1, H, W).
+            # interpolate needs 4D, so squeeze/unsqueeze around it.
+            if _5d := (len(samples.shape) == 5):
+                samples = samples.squeeze(2)
+
             samples = torch.nn.functional.interpolate(samples, size=(target_height // opt_f, target_width // opt_f), mode=self.latent_scale_mode["mode"], antialias=self.latent_scale_mode["antialias"])
+
+            if _5d:
+                samples = samples.unsqueeze(2)
 
             # Avoid making the inpainting conditioning unless necessary as
             # this does need some extra compute to decode / encode the image again.
@@ -1515,6 +1524,11 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             else:
                 image_conditioning = self.txt2img_image_conditioning(samples)
         else:
+            # Some models (e.g. Flux/Wan) produce 5D decoded output (N, 1, C, H, W).
+            # Squeeze the extra temporal dim for PIL/numpy processing.
+            if len(decoded_samples.shape) == 5:
+                decoded_samples = decoded_samples.squeeze(1)
+
             lowres_samples = torch.clamp((decoded_samples + 1.0) / 2.0, min=0.0, max=1.0)
 
             batch_images = []
