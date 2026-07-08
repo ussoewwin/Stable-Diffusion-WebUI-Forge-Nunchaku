@@ -3,6 +3,7 @@ import inspect
 import k_diffusion
 import k_diffusion.external
 import torch
+import logging
 
 import modules.shared as shared
 from backend.sampling.sampling_function import sampling_cleanup, sampling_prepare
@@ -123,17 +124,103 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         return sigmas.cpu()
 
     def sample_img2img(self, p, x, noise, conditioning, unconditional_conditioning, steps=None, image_conditioning=None):
+        def _tensor_stats(name, t):
+            if t is None:
+                return f"{name}=None"
+            with torch.no_grad():
+                td = t.detach()
+                finite = torch.isfinite(td)
+                finite_count = int(finite.sum().item())
+                total_count = td.numel()
+                nan_count = int(torch.isnan(td).sum().item())
+                inf_count = int(torch.isinf(td).sum().item())
+                if finite_count > 0:
+                    fv = td[finite]
+                    min_v = float(fv.min().item())
+                    max_v = float(fv.max().item())
+                    mean_v = float(fv.mean().item())
+                    std_v = float(fv.std(unbiased=False).item())
+                else:
+                    min_v = max_v = mean_v = std_v = None
+                return (
+                    f"{name}: shape={tuple(td.shape)} dtype={td.dtype} "
+                    f"finite={finite_count}/{total_count} nan={nan_count} inf={inf_count} "
+                    f"min={min_v} max={max_v} mean={mean_v} std={std_v}"
+                )
+
         unet_patcher = self.model_wrap.inner_model.forge_objects.unet
         sampling_prepare(self.model_wrap.inner_model.forge_objects.unet, x=x)
+
+        logging.warning(
+            "[HRDBG] kdiff sample_img2img enter "
+            f"is_hr_pass={getattr(p, 'is_hr_pass', False)} "
+            f"enable_hr={getattr(p, 'enable_hr', False)} "
+            f"denoising_strength={getattr(p, 'denoising_strength', None)} "
+            f"steps_arg={steps} "
+            f"p.steps={getattr(p, 'steps', None)} "
+            f"x_shape={tuple(x.shape)} noise_shape={tuple(noise.shape)} "
+            f"img_cond_shape={None if image_conditioning is None else tuple(image_conditioning.shape)}"
+        )
+        logging.warning(f"[HRDBG] {_tensor_stats('x_in', x)}")
+        logging.warning(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
 
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
         sigmas = self.get_sigmas(p, steps).to(x.device)
         sigma_sched = sigmas[steps - t_enc - 1 :]
 
+        predictor = getattr(self.model_wrap, "predictor", None)
+        is_anima_hr = (
+            getattr(p, "is_hr_pass", False)
+            and "anima" in (
+                getattr(getattr(getattr(p, "sd_model", None), "sd_checkpoint_info", None), "filename", "") or ""
+            ).lower()
+        )
+        if is_anima_hr and predictor is not None and hasattr(predictor, "percent_to_sigma"):
+            desired_sigma = predictor.percent_to_sigma(p.denoising_strength)
+            if len(sigma_sched) > 0:
+                old_sigma_first = float(sigma_sched[0])
+                sigma_sched = sigma_sched.clone()
+                # Rebuild sigma_sched as the tail segment of the full sigmas so the
+                # first entry is exactly percent_to_sigma(denoising_strength) and the
+                # rest of the schedule stays monotonically decreasing (ComfyUI-style).
+                # See: ComfyUI KSampler.set_steps() uses sigmas[-(steps+1):].
+                target_len = t_enc + 1
+                start_idx = max(len(sigmas) - target_len, 0)
+                while start_idx > 0 and float(sigmas[start_idx]) > desired_sigma:
+                    start_idx -= 1
+                while start_idx < len(sigmas) - 1 and float(sigmas[start_idx]) < desired_sigma:
+                    start_idx += 1
+                new_sched = sigmas[start_idx:]
+                if len(new_sched) > 0:
+                    new_sched = new_sched.clone()
+                    new_sched[0] = desired_sigma
+                    sigma_sched = new_sched
+                logging.warning(
+                    "[HRDBG] kdiff sample_img2img Anima HR sigma schedule rebuild "
+                    f"denoising_strength={p.denoising_strength} "
+                    f"desired_sigma={float(desired_sigma)} "
+                    f"old_sigma_first={old_sigma_first} "
+                    f"sigma_sched_len={len(sigma_sched)} "
+                    f"sigma_first={float(sigma_sched[0])} "
+                    f"sigma_second={float(sigma_sched[1]) if len(sigma_sched) > 1 else None} "
+                    f"monotonic={all(float(sigma_sched[i]) >= float(sigma_sched[i + 1]) for i in range(len(sigma_sched) - 1))}"
+                )
+
+        logging.warning(
+            "[HRDBG] kdiff sample_img2img schedule "
+            f"resolved_steps={steps} t_enc={t_enc} "
+            f"sigmas_len={len(sigmas)} sigma_sched_len={len(sigma_sched)} "
+            f"sigma_first={float(sigma_sched[0]) if len(sigma_sched) > 0 else None} "
+            f"sigma_last={float(sigma_sched[-1]) if len(sigma_sched) > 0 else None}"
+        )
+
         x = x.to(noise)
 
         xi = self.model_wrap.predictor.noise_scaling(sigma_sched[0], noise, x, max_denoise=False)
+
+        logging.warning(f"[HRDBG] kdiff sample_img2img xi_shape={tuple(xi.shape)}")
+        logging.warning(f"[HRDBG] {_tensor_stats('xi', xi)}")
 
         if opts.img2img_extra_noise > 0:
             p.extra_generation_params["Extra noise"] = opts.img2img_extra_noise
@@ -178,6 +265,9 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             t_enc + 1,
             lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
         )
+
+        logging.warning(f"[HRDBG] kdiff sample_img2img sampled_shape={tuple(samples.shape)}")
+        logging.warning(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
 
         self.add_infotext(p)
 

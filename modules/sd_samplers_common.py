@@ -1,4 +1,5 @@
 import inspect
+import logging
 from collections import namedtuple
 
 import k_diffusion.sampling
@@ -23,6 +24,8 @@ class SamplerData(SamplerDataTuple):
 
 
 def setup_img2img_steps(p, steps=None):
+    input_steps = steps
+
     if opts.img2img_fix_steps or steps is not None:
         requested_steps = steps or p.steps
         steps = int(requested_steps / min(p.denoising_strength, 0.999)) if p.denoising_strength > 0 else 0
@@ -30,6 +33,16 @@ def setup_img2img_steps(p, steps=None):
     else:
         steps = p.steps
         t_enc = int(min(p.denoising_strength, 0.999) * steps)
+
+    if getattr(p, "is_hr_pass", False) or getattr(p, "enable_hr", False):
+                logging.warning(
+            "[HRDBG] setup_img2img_steps "
+            f"denoising_strength={getattr(p, 'denoising_strength', None)} "
+            f"input_steps={input_steps if input_steps is not None else getattr(p, 'steps', None)} "
+            f"fix_steps={opts.img2img_fix_steps} "
+            f"resolved_steps={steps} "
+            f"t_enc={t_enc}"
+        )
 
     return steps, t_enc
 

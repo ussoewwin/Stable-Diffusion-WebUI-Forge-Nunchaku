@@ -1,4 +1,5 @@
 import inspect
+import logging
 import sys
 
 import torch
@@ -66,10 +67,47 @@ class CompVisSampler(sd_samplers_common.Sampler):
         return timesteps
 
     def sample_img2img(self, p, x, noise, conditioning, unconditional_conditioning, steps=None, image_conditioning=None):
+        def _tensor_stats(name, t):
+            if t is None:
+                return f"{name}=None"
+            with torch.no_grad():
+                td = t.detach()
+                finite = torch.isfinite(td)
+                finite_count = int(finite.sum().item())
+                total_count = td.numel()
+                nan_count = int(torch.isnan(td).sum().item())
+                inf_count = int(torch.isinf(td).sum().item())
+                if finite_count > 0:
+                    fv = td[finite]
+                    min_v = float(fv.min().item())
+                    max_v = float(fv.max().item())
+                    mean_v = float(fv.mean().item())
+                    std_v = float(fv.std(unbiased=False).item())
+                else:
+                    min_v = max_v = mean_v = std_v = None
+                return (
+                    f"{name}: shape={tuple(td.shape)} dtype={td.dtype} "
+                    f"finite={finite_count}/{total_count} nan={nan_count} inf={inf_count} "
+                    f"min={min_v} max={max_v} mean={mean_v} std={std_v}"
+                )
+
         unet_patcher = self.model_wrap.inner_model.forge_objects.unet
         sampling_prepare(self.model_wrap.inner_model.forge_objects.unet, x=x)
 
         self.model_wrap.inner_model.alphas_cumprod = self.model_wrap.inner_model.alphas_cumprod.to(x.device)
+
+        logging.warning(
+            "[HRDBG] timesteps sample_img2img enter "
+            f"is_hr_pass={getattr(p, 'is_hr_pass', False)} "
+            f"enable_hr={getattr(p, 'enable_hr', False)} "
+            f"denoising_strength={getattr(p, 'denoising_strength', None)} "
+            f"steps_arg={steps} "
+            f"p.steps={getattr(p, 'steps', None)} "
+            f"x_shape={tuple(x.shape)} noise_shape={tuple(noise.shape)} "
+            f"img_cond_shape={None if image_conditioning is None else tuple(image_conditioning.shape)}"
+        )
+        logging.warning(f"[HRDBG] {_tensor_stats('x_in', x)}")
+        logging.warning(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
 
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
@@ -81,6 +119,13 @@ class CompVisSampler(sd_samplers_common.Sampler):
         sqrt_one_minus_alpha_cumprod = torch.sqrt(1 - alphas_cumprod[timesteps[t_enc]])
 
         xi = x.to(noise) * sqrt_alpha_cumprod + noise * sqrt_one_minus_alpha_cumprod
+        logging.warning(
+            "[HRDBG] timesteps sample_img2img noise-mix "
+            f"steps={steps} t_enc={t_enc} "
+            f"timesteps_len={len(timesteps)} timesteps_sched_len={len(timesteps_sched)} "
+            f"alpha_idx={int(timesteps[t_enc].item()) if t_enc < len(timesteps) else 'out_of_range'}"
+        )
+        logging.warning(f"[HRDBG] {_tensor_stats('xi', xi)}")
 
         if opts.img2img_extra_noise > 0:
             p.extra_generation_params["Extra noise"] = opts.img2img_extra_noise
@@ -111,6 +156,7 @@ class CompVisSampler(sd_samplers_common.Sampler):
             t_enc + 1,
             lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
         )
+        logging.warning(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
 
         self.add_infotext(p)
 

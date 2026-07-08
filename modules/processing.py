@@ -1486,6 +1486,27 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
 
         target_width = self.hr_upscale_to_x
         target_height = self.hr_upscale_to_y
+        base_w = max(int(self.width or 1), 1)
+        base_h = max(int(self.height or 1), 1)
+        upscale_ratio = max(float(target_width) / base_w, float(target_height) / base_h)
+        sd_ckpt = getattr(getattr(self.sd_model, "sd_checkpoint_info", None), "filename", "") or ""
+        hr_ckpt = getattr(getattr(self, "hr_checkpoint_info", None), "filename", "") or ""
+        ckpt_for_check = (hr_ckpt or sd_ckpt).lower()
+        is_anima = "anima" in ckpt_for_check
+
+        def _hrlog(msg):
+            logging.warning(f"[HRDBG] {msg}")
+
+        _hrlog(
+            f"enter sample_hr_pass "
+            f"base_wh={self.width}x{self.height} "
+            f"target_wh={target_width}x{target_height} "
+            f"hr_upscaler={self.hr_upscaler} "
+            f"latent_scale_mode={self.latent_scale_mode} "
+            f"truncate_xy=({self.truncate_x},{self.truncate_y}) "
+            f"samples_shape={None if samples is None else tuple(samples.shape)} "
+            f"decoded_shape={None if decoded_samples is None else tuple(decoded_samples.shape)}"
+        )
 
         def save_intermediate(image, index):
             """saves image before applying hires fix, if enabled in options; takes as an argument either an image or batch with latent space images"""
@@ -1502,20 +1523,31 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         img2img_sampler_name = self.hr_sampler_name or self.sampler_name
 
         self.sampler = sd_samplers.create_sampler(img2img_sampler_name, self.sd_model)
+        _hrlog(f"hr sampler={img2img_sampler_name}")
 
         if self.latent_scale_mode is not None:
+            _hrlog("branch=latent-upscale")
             for i in range(samples.shape[0]):
                 save_intermediate(samples, i)
 
             # Some models (e.g. Flux/Wan) produce 5D latents (N, C, 1, H, W).
             # interpolate needs 4D, so squeeze/unsqueeze around it.
             if _5d := (len(samples.shape) == 5):
+                _hrlog(f"latent pre-squeeze shape={tuple(samples.shape)}")
                 samples = samples.squeeze(2)
+                _hrlog(f"latent post-squeeze shape={tuple(samples.shape)}")
 
             samples = torch.nn.functional.interpolate(samples, size=(target_height // opt_f, target_width // opt_f), mode=self.latent_scale_mode["mode"], antialias=self.latent_scale_mode["antialias"])
+            _hrlog(
+                f"latent interpolated shape={tuple(samples.shape)} "
+                f"to={(target_height // opt_f, target_width // opt_f)} "
+                f"mode={self.latent_scale_mode['mode']} "
+                f"antialias={self.latent_scale_mode['antialias']}"
+            )
 
             if _5d:
                 samples = samples.unsqueeze(2)
+                _hrlog(f"latent post-unsqueeze shape={tuple(samples.shape)}")
 
             # Avoid making the inpainting conditioning unless necessary as
             # this does need some extra compute to decode / encode the image again.
@@ -1523,13 +1555,26 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
                 image_conditioning = self.img2img_image_conditioning(decode_first_stage(self.sd_model, samples), samples)
             else:
                 image_conditioning = self.txt2img_image_conditioning(samples)
+            _hrlog(f"image_conditioning shape={tuple(image_conditioning.shape)}")
         else:
-            # Some models (e.g. Flux/Wan) produce 5D decoded output (N, 1, C, H, W).
-            # Squeeze the extra temporal dim for PIL/numpy processing.
+            _hrlog("branch=pixel-upscale")
+            # Some models (e.g. Flux/Wan/Anima backends) can yield 5D decoded output.
+            # Normalize to BCHW for PIL/numpy processing.
             if len(decoded_samples.shape) == 5:
-                decoded_samples = decoded_samples.squeeze(1)
+                _hrlog(f"decoded pre-normalize shape={tuple(decoded_samples.shape)}")
+                if decoded_samples.shape[1] == 1:
+                    # (N, 1, C, H, W) -> (N, C, H, W)
+                    decoded_samples = decoded_samples[:, 0]
+                elif decoded_samples.shape[2] == 1:
+                    # (N, C, 1, H, W) -> (N, C, H, W)
+                    decoded_samples = decoded_samples[:, :, 0]
+                else:
+                    # HiRes pass is single-frame; use first temporal slice if present.
+                    decoded_samples = decoded_samples[:, 0]
+                _hrlog(f"decoded post-normalize shape={tuple(decoded_samples.shape)}")
 
             lowres_samples = torch.clamp((decoded_samples + 1.0) / 2.0, min=0.0, max=1.0)
+            _hrlog(f"lowres_samples shape={tuple(lowres_samples.shape)}")
 
             batch_images = []
             for i, x_sample in enumerate(lowres_samples):
@@ -1546,19 +1591,38 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
 
             decoded_samples = torch.from_numpy(np.array(batch_images))
             decoded_samples = decoded_samples.to(shared.device, dtype=torch.float32)
+            _hrlog(f"decoded upscaled batch shape={tuple(decoded_samples.shape)}")
 
             if opts.sd_vae_encode_method != "Full":
                 self.extra_generation_params["VAE Encoder"] = opts.sd_vae_encode_method
             samples = images_tensor_to_samples(decoded_samples, approximation_indexes.get(opts.sd_vae_encode_method))
+            _hrlog(f"re-encoded samples shape={tuple(samples.shape)}")
 
             image_conditioning = self.img2img_image_conditioning(decoded_samples, samples)
+            _hrlog(f"image_conditioning shape={tuple(image_conditioning.shape)}")
 
         shared.state.nextjob()
 
-        samples = samples[:, :, self.truncate_y // 2 : samples.shape[2] - (self.truncate_y + 1) // 2, self.truncate_x // 2 : samples.shape[3] - (self.truncate_x + 1) // 2]
+        y0 = self.truncate_y // 2
+        y1 = -((self.truncate_y + 1) // 2)
+        if y1 == 0:
+            y1 = None
+        x0 = self.truncate_x // 2
+        x1 = -((self.truncate_x + 1) // 2)
+        if x1 == 0:
+            x1 = None
+        _hrlog(f"truncate crop coords x=({x0},{x1}) y=({y0},{y1})")
+
+        if len(samples.shape) == 5:
+            # 5D latent: crop spatial dims at the end (H, W), not temporal dim.
+            samples = samples[:, :, :, y0:y1, x0:x1]
+        else:
+            samples = samples[:, :, y0:y1, x0:x1]
+        _hrlog(f"samples after truncate shape={tuple(samples.shape)}")
 
         self.rng = rng.ImageRNG(samples.shape[1:], self.seeds, subseeds=self.subseeds, subseed_strength=self.subseed_strength, seed_resize_from_h=self.seed_resize_from_h, seed_resize_from_w=self.seed_resize_from_w)
         noise = self.rng.next()
+        _hrlog(f"hr noise shape={tuple(noise.shape)}")
 
         # GC now before running the next img2img to prevent running out of memory
         devices.torch_gc()
@@ -1581,7 +1645,8 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             )
 
         self.sd_model.forge_objects = self.sd_model.forge_objects_after_applying_lora.shallow_copy()
-        apply_token_merging(self.sd_model, self.get_token_merging_ratio(for_hr=True))
+        hr_token_merging_ratio = self.get_token_merging_ratio(for_hr=True)
+        apply_token_merging(self.sd_model, hr_token_merging_ratio)
 
         if self.scripts is not None:
             self.scripts.process_before_every_sampling(self, x=samples, noise=noise, c=self.hr_c, uc=self.hr_uc)
@@ -1590,7 +1655,16 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             noise = self.modified_noise
             self.modified_noise = None
 
-        samples = self.sampler.sample_img2img(self, samples, noise, self.hr_c, self.hr_uc, steps=self.hr_second_pass_steps or self.steps, image_conditioning=image_conditioning)
+        samples = self.sampler.sample_img2img(
+            self,
+            samples,
+            noise,
+            self.hr_c,
+            self.hr_uc,
+            steps=self.hr_second_pass_steps or self.steps,
+            image_conditioning=image_conditioning,
+        )
+        _hrlog(f"sample_img2img output shape={tuple(samples.shape)}")
 
         self.sampler = None
         devices.torch_gc()
