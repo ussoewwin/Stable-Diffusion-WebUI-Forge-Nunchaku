@@ -151,7 +151,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         unet_patcher = self.model_wrap.inner_model.forge_objects.unet
         sampling_prepare(self.model_wrap.inner_model.forge_objects.unet, x=x)
 
-        logging.warning(
+        logging.info(
             "[HRDBG] kdiff sample_img2img enter "
             f"is_hr_pass={getattr(p, 'is_hr_pass', False)} "
             f"enable_hr={getattr(p, 'enable_hr', False)} "
@@ -188,7 +188,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
                 # which equals what sigma_sched already is (sigmas[steps-t_enc-1:]).
                 # We do NOT override sigma_sched[0] — ComfyUI doesn't either.
                 # The sigma_first stays at ~0.88 (the natural tail value).
-                logging.warning(
+                logging.info(
                     "[HRDBG] kdiff sample_img2img Anima HR sigma schedule "
                     f"denoising_strength={p.denoising_strength} "
                     f"desired_sigma={float(desired_sigma)} "
@@ -198,7 +198,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
                     f"monotonic={all(float(sigma_sched[i]) >= float(sigma_sched[i + 1]) for i in range(len(sigma_sched) - 1))}"
                 )
 
-        logging.warning(
+        logging.info(
             "[HRDBG] kdiff sample_img2img schedule "
             f"resolved_steps={steps} t_enc={t_enc} "
             f"sigmas_len={len(sigmas)} sigma_sched_len={len(sigma_sched)} "
