@@ -15,7 +15,7 @@
   - **仅 Anima**：VAE 解码后动态 min/max 归一化；共用路径上支持 **5D 解码张量**归一化与 **5D truncate** 裁剪。
   - Anima Hires **sigma 调度**与 ComfyUI 对齐。非 Anima 及 **latent 放大** Hires 不变（v1.7.8 的 5D 辅助逻辑除外）。
   - 变更限于 **`modules/processing.py`**。
-  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.9)。
+  - 详情请参阅 [Release Notes（中文）](v1.7.9.md)。
 
 ## Version 1.7.8
 
