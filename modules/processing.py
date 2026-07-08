@@ -1633,6 +1633,33 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             samples = samples[:, :, y0:y1, x0:x1]
         _hrlog(f"samples after truncate shape={tuple(samples.shape)}")
 
+        # ------------------------------------------------------------------
+        # Anima-specific tiled img2img (USDU-equivalent)
+        # ------------------------------------------------------------------
+        # Anima (and similar models) are trained at ~1024-class resolution.
+        # Running a single full-image img2img pass at 2048x2832 with
+        # denoising_strength=0.7 injects heavy noise in an out-of-distribution
+        # resolution, producing noise/breakage.
+        #
+        # ComfyUI USDU handles this by tiling the upscaled image and running
+        # img2img per-tile (each tile stays within the training resolution).
+        # Here we replicate that approach for Anima only.
+        # ------------------------------------------------------------------
+        if is_anima and self.latent_scale_mode is None:
+            _hrlog("Anima tiled img2img path entered")
+            samples = self._anima_tiled_img2img(
+                samples, image_conditioning, target_width, target_height, _hrlog
+            )
+            decoded_samples = decode_latent_batch(
+                self.sd_model, samples, target_device=devices.cpu, check_for_nans=True
+            )
+            self.is_hr_pass = False
+            return decoded_samples
+
+        # ------------------------------------------------------------------
+        # Default (non-Anima, or latent-scale path): single full img2img
+        # ------------------------------------------------------------------
+
         self.rng = rng.ImageRNG(samples.shape[1:], self.seeds, subseeds=self.subseeds, subseed_strength=self.subseed_strength, seed_resize_from_h=self.seed_resize_from_h, seed_resize_from_w=self.seed_resize_from_w)
         noise = self.rng.next()
         _hrlog(f"hr noise shape={tuple(noise.shape)}")
@@ -1687,7 +1714,233 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         self.is_hr_pass = False
         return decoded_samples
 
-    def close(self):
+    def _anima_tiled_img2img(self, samples, image_conditioning, target_width, target_height, _hrlog):
+        """
+        Anima-only tiled img2img for Hires fix pixel-upscale path.
+
+        Splits the upscaled latent into overlapping tiles (each ~1024px in pixel
+        space, i.e. ~128px in latent space for SDXL/Anima opt_f=8), runs
+        sample_img2img per tile, and stitches results back. This mirrors the
+        ComfyUI USDU approach that keeps each sampling pass within the model's
+        training resolution, preventing noise breakage at high resolutions.
+        """
+        import math
+
+        opt_f_val = 8  # Anima uses standard opt_f=8 (pixel/latent ratio)
+        is_5d = len(samples.shape) == 5
+
+        # Latent spatial dims
+        if is_5d:
+            _, C, T, H, W = samples.shape
+        else:
+            _, C, H, W = samples.shape
+
+        # Tile size in latent space. 1024px / 8 = 128. Use 128 with padding.
+        tile_latent = 128
+        # Padding in latent space (overlap between tiles)
+        pad_latent = 16
+
+        # If the image is small enough to fit in a single tile, fall back to
+        # the default single-pass path.
+        if H <= tile_latent and W <= tile_latent:
+            _hrlog("Anima tiled: image small enough, falling back to single pass")
+            return self._anima_single_img2img(samples, image_conditioning, _hrlog)
+
+        # Compute tile grid
+        n_tiles_x = max(1, math.ceil(W / tile_latent))
+        n_tiles_y = max(1, math.ceil(H / tile_latent))
+        # Actual tile dimensions (last tile may be smaller)
+        _hrlog(
+            f"Anima tiled: latent HxW={H}x{W} tile_latent={tile_latent} "
+            f"grid={n_tiles_y}x{n_tiles_x} is_5d={is_5d}"
+        )
+
+        # Prepare conditioning
+        if not self.disable_extra_networks:
+            with devices.autocast():
+                extra_networks.activate(self, self.hr_extra_network_data)
+        with devices.autocast():
+            self.calculate_hr_conds()
+
+        self.sd_model.forge_objects = self.sd_model.forge_objects_after_applying_lora.shallow_copy()
+        hr_token_merging_ratio = self.get_token_merging_ratio(for_hr=True)
+        apply_token_merging(self.sd_model, hr_token_merging_ratio)
+
+        if self.scripts is not None:
+            self.scripts.before_hr(self)
+
+        # Output buffer (same shape as samples, on CPU)
+        out_samples = torch.zeros_like(samples, device=devices.cpu)
+        # Weight mask for blending overlaps
+        weight_mask = torch.zeros(
+            (1,) + (1,) * (samples.ndim - 3) + (H, W),
+            device=devices.cpu,
+            dtype=torch.float32,
+        )
+
+        tile_idx = 0
+        total_tiles = n_tiles_y * n_tiles_x
+
+        for ty in range(n_tiles_y):
+            for tx in range(n_tiles_x):
+                if shared.state.interrupted:
+                    _hrlog("Anima tiled: interrupted by user")
+                    return samples.to(devices.cpu)
+
+                # Tile boundaries in latent space
+                y_start = ty * tile_latent
+                x_start = tx * tile_latent
+                y_end = min(y_start + tile_latent, H)
+                x_end = min(x_start + tile_latent, W)
+
+                # Expand with padding (overlap) but clamp to bounds
+                y0 = max(0, y_start - pad_latent)
+                y1 = min(H, y_end + pad_latent)
+                x0 = max(0, x_start - pad_latent)
+                x1 = min(W, x_end + pad_latent)
+
+                tile_idx += 1
+                _hrlog(
+                    f"Anima tiled: tile {tile_idx}/{total_tiles} "
+                    f"ty={ty} tx={tx} latent_roi=({y0}:{y1},{x0}:{x1})"
+                )
+
+                # Extract tile latent
+                if is_5d:
+                    tile_lat = samples[:, :, :, y0:y1, x0:x1].to(shared.device)
+                else:
+                    tile_lat = samples[:, :, y0:y1, x0:x1].to(shared.device)
+
+                # Tile image_conditioning: if it has spatial dims, crop;
+                # if it's a vector (e.g. (N, 5, 1, 1)), pass as-is.
+                tile_ic = image_conditioning
+                if image_conditioning is not None and len(image_conditioning.shape) >= 4:
+                    ic_h = image_conditioning.shape[-2]
+                    ic_w = image_conditioning.shape[-1]
+                    if ic_h > 1 and ic_w > 1:
+                        ic_y0 = (y0 * image_conditioning.shape[-2]) // H
+                        ic_y1 = (y1 * image_conditioning.shape[-2]) // H
+                        ic_x0 = (x0 * image_conditioning.shape[-1]) // W
+                        ic_x1 = (x1 * image_conditioning.shape[-1]) // W
+                        tile_ic = image_conditioning[..., ic_y0:ic_y1, ic_x0:ic_x1]
+
+                # Per-tile RNG: derive a stable seed from base seed + tile index
+                base_seed = int(self.seeds[0]) if self.seeds else 0
+                tile_seed = (base_seed + tile_idx * 2654435761) & 0xFFFFFFFF
+                tile_rng = rng.ImageRNG(
+                    tile_lat.shape[1:],
+                    [tile_seed],
+                    subseeds=self.subseeds,
+                    subseed_strength=self.subseed_strength,
+                    seed_resize_from_h=self.seed_resize_from_h,
+                    seed_resize_from_w=self.seed_resize_from_w,
+                )
+                tile_noise = tile_rng.next()
+
+                if self.scripts is not None:
+                    self.scripts.process_before_every_sampling(
+                        p=self,
+                        x=tile_lat,
+                        noise=tile_noise,
+                        c=self.hr_c,
+                        uc=self.hr_uc,
+                    )
+
+                if self.modified_noise is not None:
+                    tile_noise = self.modified_noise
+                    self.modified_noise = None
+
+                try:
+                    tile_out = self.sampler.sample_img2img(
+                        self,
+                        tile_lat,
+                        tile_noise,
+                        self.hr_c,
+                        self.hr_uc,
+                        steps=self.hr_second_pass_steps or self.steps,
+                        image_conditioning=tile_ic,
+                    )
+                except Exception as e:
+                    _hrlog(f"Anima tiled: tile {tile_idx} failed: {e}")
+                    tile_out = tile_lat
+
+                tile_out = tile_out.to(devices.cpu)
+
+                # Compute blend weights for this tile (linear ramp in padding zone)
+                th = y1 - y0
+                tw = x1 - x0
+                w = torch.ones((th, tw), dtype=torch.float32, device=devices.cpu)
+                # Apply linear ramp in padded regions
+                if pad_latent > 0:
+                    for i in range(pad_latent):
+                        v = (i + 1) / (pad_latent + 1)
+                        if y0 > 0:
+                            w[i, :] = min(w[i, :], v)
+                        if y1 < H:
+                            w[th - 1 - i, :] = min(w[th - 1 - i, :], v)
+                        if x0 > 0:
+                            w[:, i] = min(w[:, i], v)
+                        if x1 < W:
+                            w[:, tw - 1 - i] = min(w[:, tw - 1 - i], v)
+
+                # Accumulate
+                if is_5d:
+                    out_samples[:, :, :, y0:y1, x0:x1] += tile_out * w[None, None, None, :, :]
+                else:
+                    out_samples[:, :, y0:y1, x0:x1] += tile_out * w[None, None, :, :]
+                weight_mask[:, :, :, y0:y1, x0:x1] += w[None, None, None, :, :] if is_5d else w[None, None, :, :]
+
+                devices.torch_gc()
+
+        # Normalize by weight mask
+        weight_mask = torch.clamp(weight_mask, min=1e-8)
+        if is_5d:
+            out_samples = out_samples / weight_mask
+        else:
+            out_samples = out_samples / weight_mask
+
+        _hrlog(f"Anima tiled: done out_shape={tuple(out_samples.shape)}")
+        self.sampler = None
+        devices.torch_gc()
+        return out_samples
+
+    def _anima_single_img2img(self, samples, image_conditioning, _hrlog):
+        """Fallback single-pass img2img for Anima when image fits in one tile."""
+        self.rng = rng.ImageRNG(
+            samples.shape[1:],
+            self.seeds,
+            subseeds=self.subseeds,
+            subseed_strength=self.subseed_strength,
+            seed_resize_from_h=self.seed_resize_from_h,
+            seed_resize_from_w=self.seed_resize_from_w,
+        )
+        noise = self.rng.next()
+        _hrlog(f"Anima single: noise shape={tuple(noise.shape)}")
+
+        devices.torch_gc()
+
+        if self.scripts is not None:
+            self.scripts.process_before_every_sampling(
+                p=self, x=samples, noise=noise, c=self.hr_c, uc=self.hr_uc
+            )
+
+        if self.modified_noise is not None:
+            noise = self.modified_noise
+            self.modified_noise = None
+
+        samples = self.sampler.sample_img2img(
+            self,
+            samples,
+            noise,
+            self.hr_c,
+            self.hr_uc,
+            steps=self.hr_second_pass_steps or self.steps,
+            image_conditioning=image_conditioning,
+        )
+        _hrlog(f"Anima single: out shape={tuple(samples.shape)}")
+        self.sampler = None
+        devices.torch_gc()
+        return samples
         super().close()
         self.hr_c = None
         self.hr_uc = None
