@@ -13,7 +13,7 @@
   - 修复 latent 空间超分时的 **`ValueError: Input and output must have the same number of spatial dimensions`** 错误：在 `torch.nn.functional.interpolate` 调用前后，对 5D latent `(N, C, 1, H, W)` 的额外时间轴维度（dim 2）进行局部 squeeze / unsqueeze 处理。
   - 修复像素空间超分（pixel-space upscale）时的 **`TypeError: Cannot handle this data type: (1, 1, 1, 1024)`** 错误：在进行 NumPy / PIL 转换前，对 5D VAE 解码输出 `(N, 1, C, H, W)` 的额外时间轴维度（dim 1）进行 squeeze 处理。
   - 这些 squeeze 处理仅在检测到 5D 张量时生效。标准 4D latent 模型（SD 1.5, SDXL, 动漫模型等）会直接跳过该处理，因此完全不受影响。
-  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.8)。
+  - 详情请参阅 [Release Notes（中文）](v1.7.8.md)。
 
 ## Version 1.7.7
 
