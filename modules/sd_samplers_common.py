@@ -35,7 +35,7 @@ def setup_img2img_steps(p, steps=None):
         t_enc = int(min(p.denoising_strength, 0.999) * steps)
 
     if getattr(p, "is_hr_pass", False) or getattr(p, "enable_hr", False):
-                logging.info(
+                print(
             "[HRDBG] setup_img2img_steps "
             f"denoising_strength={getattr(p, 'denoising_strength', None)} "
             f"input_steps={input_steps if input_steps is not None else getattr(p, 'steps', None)} "

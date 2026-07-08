@@ -151,7 +151,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
         unet_patcher = self.model_wrap.inner_model.forge_objects.unet
         sampling_prepare(self.model_wrap.inner_model.forge_objects.unet, x=x)
 
-        logging.info(
+        print(
             "[HRDBG] kdiff sample_img2img enter "
             f"is_hr_pass={getattr(p, 'is_hr_pass', False)} "
             f"enable_hr={getattr(p, 'enable_hr', False)} "
@@ -161,8 +161,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             f"x_shape={tuple(x.shape)} noise_shape={tuple(noise.shape)} "
             f"img_cond_shape={None if image_conditioning is None else tuple(image_conditioning.shape)}"
         )
-        logging.info(f"[HRDBG] {_tensor_stats('x_in', x)}")
-        logging.info(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
+        print(f"[HRDBG] {_tensor_stats('x_in', x)}")
+        print(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
 
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
@@ -188,7 +188,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
                 # which equals what sigma_sched already is (sigmas[steps-t_enc-1:]).
                 # We do NOT override sigma_sched[0] — ComfyUI doesn't either.
                 # The sigma_first stays at ~0.88 (the natural tail value).
-                logging.info(
+                print(
                     "[HRDBG] kdiff sample_img2img Anima HR sigma schedule "
                     f"denoising_strength={p.denoising_strength} "
                     f"desired_sigma={float(desired_sigma)} "
@@ -198,7 +198,7 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
                     f"monotonic={all(float(sigma_sched[i]) >= float(sigma_sched[i + 1]) for i in range(len(sigma_sched) - 1))}"
                 )
 
-        logging.info(
+        print(
             "[HRDBG] kdiff sample_img2img schedule "
             f"resolved_steps={steps} t_enc={t_enc} "
             f"sigmas_len={len(sigmas)} sigma_sched_len={len(sigma_sched)} "
@@ -210,8 +210,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
 
         xi = self.model_wrap.predictor.noise_scaling(sigma_sched[0], noise, x, max_denoise=False)
 
-        logging.info(f"[HRDBG] kdiff sample_img2img xi_shape={tuple(xi.shape)}")
-        logging.info(f"[HRDBG] {_tensor_stats('xi', xi)}")
+        print(f"[HRDBG] kdiff sample_img2img xi_shape={tuple(xi.shape)}")
+        print(f"[HRDBG] {_tensor_stats('xi', xi)}")
 
         if opts.img2img_extra_noise > 0:
             p.extra_generation_params["Extra noise"] = opts.img2img_extra_noise
@@ -257,8 +257,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
         )
 
-        logging.info(f"[HRDBG] kdiff sample_img2img sampled_shape={tuple(samples.shape)}")
-        logging.info(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
+        print(f"[HRDBG] kdiff sample_img2img sampled_shape={tuple(samples.shape)}")
+        print(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
 
         self.add_infotext(p)
 
