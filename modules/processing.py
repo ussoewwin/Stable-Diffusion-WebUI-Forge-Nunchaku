@@ -1495,7 +1495,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
         is_anima = "anima" in ckpt_for_check
 
         def _hrlog(msg):
-            logging.warning(f"[HRDBG] {msg}")
+            logging.info(f"[HRDBG] {msg}")
 
         _hrlog(
             f"enter sample_hr_pass "

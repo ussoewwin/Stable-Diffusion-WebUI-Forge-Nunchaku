@@ -106,8 +106,8 @@ class CompVisSampler(sd_samplers_common.Sampler):
             f"x_shape={tuple(x.shape)} noise_shape={tuple(noise.shape)} "
             f"img_cond_shape={None if image_conditioning is None else tuple(image_conditioning.shape)}"
         )
-        logging.warning(f"[HRDBG] {_tensor_stats('x_in', x)}")
-        logging.warning(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
+        logging.info(f"[HRDBG] {_tensor_stats('x_in', x)}")
+        logging.info(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
 
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
@@ -125,7 +125,7 @@ class CompVisSampler(sd_samplers_common.Sampler):
             f"timesteps_len={len(timesteps)} timesteps_sched_len={len(timesteps_sched)} "
             f"alpha_idx={int(timesteps[t_enc].item()) if t_enc < len(timesteps) else 'out_of_range'}"
         )
-        logging.warning(f"[HRDBG] {_tensor_stats('xi', xi)}")
+        logging.info(f"[HRDBG] {_tensor_stats('xi', xi)}")
 
         if opts.img2img_extra_noise > 0:
             p.extra_generation_params["Extra noise"] = opts.img2img_extra_noise
@@ -156,7 +156,7 @@ class CompVisSampler(sd_samplers_common.Sampler):
             t_enc + 1,
             lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
         )
-        logging.warning(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
+        logging.info(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
 
         self.add_infotext(p)
 

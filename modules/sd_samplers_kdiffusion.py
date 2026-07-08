@@ -161,8 +161,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             f"x_shape={tuple(x.shape)} noise_shape={tuple(noise.shape)} "
             f"img_cond_shape={None if image_conditioning is None else tuple(image_conditioning.shape)}"
         )
-        logging.warning(f"[HRDBG] {_tensor_stats('x_in', x)}")
-        logging.warning(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
+        logging.info(f"[HRDBG] {_tensor_stats('x_in', x)}")
+        logging.info(f"[HRDBG] {_tensor_stats('noise_in', noise)}")
 
         steps, t_enc = sd_samplers_common.setup_img2img_steps(p, steps)
 
@@ -210,8 +210,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
 
         xi = self.model_wrap.predictor.noise_scaling(sigma_sched[0], noise, x, max_denoise=False)
 
-        logging.warning(f"[HRDBG] kdiff sample_img2img xi_shape={tuple(xi.shape)}")
-        logging.warning(f"[HRDBG] {_tensor_stats('xi', xi)}")
+        logging.info(f"[HRDBG] kdiff sample_img2img xi_shape={tuple(xi.shape)}")
+        logging.info(f"[HRDBG] {_tensor_stats('xi', xi)}")
 
         if opts.img2img_extra_noise > 0:
             p.extra_generation_params["Extra noise"] = opts.img2img_extra_noise
@@ -257,8 +257,8 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             lambda: self.func(self.model_wrap_cfg, xi, extra_args=self.sampler_extra_args, disable=False, callback=self.callback_state, **extra_params_kwargs),
         )
 
-        logging.warning(f"[HRDBG] kdiff sample_img2img sampled_shape={tuple(samples.shape)}")
-        logging.warning(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
+        logging.info(f"[HRDBG] kdiff sample_img2img sampled_shape={tuple(samples.shape)}")
+        logging.info(f"[HRDBG] {_tensor_stats('samples_out', samples)}")
 
         self.add_infotext(p)
 
