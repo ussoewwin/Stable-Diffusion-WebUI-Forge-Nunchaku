@@ -1875,13 +1875,13 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
                     for i in range(pad_latent):
                         v = (i + 1) / (pad_latent + 1)
                         if y0 > 0:
-                            w[i, :] = min(w[i, :], v)
+                            w[i, :] = torch.clamp(w[i, :], max=v)
                         if y1 < H:
-                            w[th - 1 - i, :] = min(w[th - 1 - i, :], v)
+                            w[th - 1 - i, :] = torch.clamp(w[th - 1 - i, :], max=v)
                         if x0 > 0:
-                            w[:, i] = min(w[:, i], v)
+                            w[:, i] = torch.clamp(w[:, i], max=v)
                         if x1 < W:
-                            w[:, tw - 1 - i] = min(w[:, tw - 1 - i], v)
+                            w[:, tw - 1 - i] = torch.clamp(w[:, tw - 1 - i], max=v)
 
                 # Accumulate
                 if is_5d:

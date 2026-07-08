@@ -180,30 +180,21 @@ class KDiffusionSampler(sd_samplers_common.Sampler):
             desired_sigma = predictor.percent_to_sigma(p.denoising_strength)
             if len(sigma_sched) > 0:
                 old_sigma_first = float(sigma_sched[0])
-                sigma_sched = sigma_sched.clone()
-                # Rebuild sigma_sched as the tail segment of the full sigmas so the
-                # first entry is exactly percent_to_sigma(denoising_strength) and the
-                # rest of the schedule stays monotonically decreasing (ComfyUI-style).
-                # See: ComfyUI KSampler.set_steps() uses sigmas[-(steps+1):].
-                target_len = t_enc + 1
-                start_idx = max(len(sigmas) - target_len, 0)
-                while start_idx > 0 and float(sigmas[start_idx]) > desired_sigma:
-                    start_idx -= 1
-                while start_idx < len(sigmas) - 1 and float(sigmas[start_idx]) < desired_sigma:
-                    start_idx += 1
-                new_sched = sigmas[start_idx:]
-                if len(new_sched) > 0:
-                    new_sched = new_sched.clone()
-                    new_sched[0] = desired_sigma
-                    sigma_sched = new_sched
+                # ComfyUI KSampler.set_steps: new_steps = int(steps/denoise),
+                # sigmas = calculate_sigmas(new_steps), sigmas = sigmas[-(steps+1):].
+                # Forge already computes resolved_steps = int(steps/denoise) and
+                # full sigmas for resolved_steps. So the correct tail slice is:
+                #   sigmas[-(t_enc+1):]
+                # which equals what sigma_sched already is (sigmas[steps-t_enc-1:]).
+                # We do NOT override sigma_sched[0] — ComfyUI doesn't either.
+                # The sigma_first stays at ~0.88 (the natural tail value).
                 logging.warning(
-                    "[HRDBG] kdiff sample_img2img Anima HR sigma schedule rebuild "
+                    "[HRDBG] kdiff sample_img2img Anima HR sigma schedule "
                     f"denoising_strength={p.denoising_strength} "
                     f"desired_sigma={float(desired_sigma)} "
-                    f"old_sigma_first={old_sigma_first} "
-                    f"sigma_sched_len={len(sigma_sched)} "
                     f"sigma_first={float(sigma_sched[0])} "
                     f"sigma_second={float(sigma_sched[1]) if len(sigma_sched) > 1 else None} "
+                    f"sigma_sched_len={len(sigma_sched)} "
                     f"monotonic={all(float(sigma_sched[i]) >= float(sigma_sched[i + 1]) for i in range(len(sigma_sched) - 1))}"
                 )
 
