@@ -306,7 +306,14 @@ def requirements_met(requirements_file):
 
 def prepare_environment():
     torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu130")
-    torch_command = os.environ.get("TORCH_COMMAND", f"pip install torch==2.11.0+cu130 torchvision==0.26.0+cu130 torchaudio==2.11.0+cu130 --extra-index-url {torch_index_url}")
+    # Initial-install defaults only. Already-installed packages (including newer builds) are left alone.
+    torch_default = os.environ.get("TORCH_PACKAGE", "torch==2.11.0+cu130")
+    torchvision_default = os.environ.get("TORCHVISION_PACKAGE", "torchvision==0.26.0+cu130")
+    torchaudio_default = os.environ.get("TORCHAUDIO_PACKAGE", "torchaudio==2.11.0+cu130")
+    torch_command = os.environ.get(
+        "TORCH_COMMAND",
+        f"pip install {torch_default} {torchvision_default} {torchaudio_default} --extra-index-url {torch_index_url}",
+    )
     xformers_package = os.environ.get("XFORMERS_PACKAGE", f"xformers==0.0.33.post2 --extra-index-url {torch_index_url}")
     bnb_package = os.environ.get("BNB_PACKAGE", "bitsandbytes==0.48.2")
 
@@ -332,9 +339,28 @@ def prepare_environment():
     print(f"Python {sys.version}")
     print(f"Version: {tag}")
 
-    if args.reinstall_torch or not is_installed("torch") or not is_installed("torchvision") or not is_installed("torchaudio"):
+    # Per-package: install default 2.11.0+cu130 stack only when missing.
+    # If torch / torchvision / torchaudio is already installed (including newer), do nothing to that package.
+    # --reinstall-torch forces the full default stack.
+    if args.reinstall_torch:
         run(f'"{python}" -m {torch_command}', "Installing torch, torchvision and torchaudio", "Couldn't install torch", live=True)
         startup_timer.record("install torch")
+    else:
+        torch_pkgs = []
+        if not is_installed("torch"):
+            torch_pkgs.append(torch_default)
+        if not is_installed("torchvision"):
+            torch_pkgs.append(torchvision_default)
+        if not is_installed("torchaudio"):
+            torch_pkgs.append(torchaudio_default)
+        if torch_pkgs:
+            run(
+                f'"{python}" -m pip install {" ".join(torch_pkgs)} --extra-index-url {torch_index_url}',
+                "Installing missing torch stack packages",
+                "Couldn't install torch stack",
+                live=True,
+            )
+            startup_timer.record("install torch")
 
     if not args.skip_torch_cuda_test:
         success, err = check_run_python("import torch; assert torch.cuda.is_available()", return_error=True)

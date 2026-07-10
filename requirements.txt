@@ -53,7 +53,7 @@ torchdiffeq==0.2.5
 torchsde==0.2.6
 tqdm==4.67.1
 transformers>=5.4.0
-torch
+# torch is managed by launch_utils TORCH_COMMAND (do not list here: pip -U -r would clobber CUDA builds)
 python-socketio
 typer-config
 loguru
