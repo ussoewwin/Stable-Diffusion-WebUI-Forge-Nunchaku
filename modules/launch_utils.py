@@ -136,35 +136,36 @@ def run_pip(command, desc=None, live=default_command_live):
 
 
 def _torch_stack_constraint_file() -> str | None:
-    """Write installed torch/torchvision/torchaudio pins so pip cannot replace CUDA builds with PyPI CPU wheels."""
+    """
+    Pin only installed torch (exact local version, e.g. 2.13.0+cu132).
+    Do not pin torchvision/torchaudio here: their metadata often requires a different torch
+    (e.g. torchvision 0.27.1+cu132 -> torch==2.12.1), and pinning all three makes
+    `pip install -r requirements.txt` fail with ResolutionImpossible.
+    """
     import importlib.metadata
 
-    pins = []
-    for pkg in ("torch", "torchvision", "torchaudio"):
-        try:
-            pins.append(f"{pkg}=={importlib.metadata.version(pkg)}")
-        except importlib.metadata.PackageNotFoundError:
-            continue
-    if not pins:
+    try:
+        ver = importlib.metadata.version("torch")
+    except importlib.metadata.PackageNotFoundError:
         return None
 
     path = os.path.join(script_path, "tmp", "torch_stack_constraints.txt")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(pins) + "\n")
+        f.write(f"torch=={ver}\n")
     return path
 
 
 def _apply_torch_stack_pip_constraint() -> None:
     """
-    Pin the installed torch stack for all subsequent pip installs (including extension install.py).
-    Root cause of torch reverting to +cpu: `pip install -U` / package deps resolve torch from PyPI.
+    Pin installed torch for subsequent pip installs (including extension install.py).
+    Prevents PyPI CPU torch from replacing a CUDA build during `pip install -U` / deps.
     """
     path = _torch_stack_constraint_file()
     if path is None:
         return
     os.environ["PIP_CONSTRAINT"] = path
-    print(f"Torch stack pinned ({path}); pip will not replace torch/torchvision/torchaudio")
+    print(f"Torch pinned ({path}); pip will not replace torch")
 
 
 def check_run_python(code: str, *, return_error: bool = False) -> bool | tuple[bool, str]:

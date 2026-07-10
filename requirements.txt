@@ -45,7 +45,7 @@ pydantic==2.9.2
 resize-right==0.0.2
 safetensors==0.8.0rc0
 scikit-image==0.25.2
-setuptools==69.5.1
+setuptools>=77.0.3,<82
 spandrel-extra-arches==0.2.0
 spandrel==0.4.1
 tomesd==0.1.3
