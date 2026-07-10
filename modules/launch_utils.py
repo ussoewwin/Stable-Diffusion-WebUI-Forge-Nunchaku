@@ -135,6 +135,38 @@ def run_pip(command, desc=None, live=default_command_live):
     return run(f'"{python}" -m pip {command}{prefer_binary_flag}{index_url_line}', desc=f"Installing {desc}", errdesc=f"Couldn't install {desc}", live=live)
 
 
+def _torch_stack_constraint_file() -> str | None:
+    """Write installed torch/torchvision/torchaudio pins so pip cannot replace CUDA builds with PyPI CPU wheels."""
+    import importlib.metadata
+
+    pins = []
+    for pkg in ("torch", "torchvision", "torchaudio"):
+        try:
+            pins.append(f"{pkg}=={importlib.metadata.version(pkg)}")
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    if not pins:
+        return None
+
+    path = os.path.join(script_path, "tmp", "torch_stack_constraints.txt")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(pins) + "\n")
+    return path
+
+
+def _apply_torch_stack_pip_constraint() -> None:
+    """
+    Pin the installed torch stack for all subsequent pip installs (including extension install.py).
+    Root cause of torch reverting to +cpu: `pip install -U` / package deps resolve torch from PyPI.
+    """
+    path = _torch_stack_constraint_file()
+    if path is None:
+        return
+    os.environ["PIP_CONSTRAINT"] = path
+    print(f"Torch stack pinned ({path}); pip will not replace torch/torchvision/torchaudio")
+
+
 def check_run_python(code: str, *, return_error: bool = False) -> bool | tuple[bool, str]:
     result = subprocess.run([python, "-c", code], capture_output=True, shell=False)
     if return_error:
@@ -343,6 +375,7 @@ def prepare_environment():
     # If torch / torchvision / torchaudio is already installed (including newer), do nothing to that package.
     # --reinstall-torch forces the full default stack.
     if args.reinstall_torch:
+        os.environ.pop("PIP_CONSTRAINT", None)
         run(f'"{python}" -m {torch_command}', "Installing torch, torchvision and torchaudio", "Couldn't install torch", live=True)
         startup_timer.record("install torch")
     else:
@@ -354,6 +387,7 @@ def prepare_environment():
         if not is_installed("torchaudio"):
             torch_pkgs.append(torchaudio_default)
         if torch_pkgs:
+            os.environ.pop("PIP_CONSTRAINT", None)
             run(
                 f'"{python}" -m pip install {" ".join(torch_pkgs)} --extra-index-url {torch_index_url}',
                 "Installing missing torch stack packages",
@@ -361,6 +395,9 @@ def prepare_environment():
                 live=True,
             )
             startup_timer.record("install torch")
+
+    # After torch stack is settled, pin it so later pip -U / deps cannot swap in PyPI CPU torch.
+    _apply_torch_stack_pip_constraint()
 
     if not args.skip_torch_cuda_test:
         success, err = check_run_python("import torch; assert torch.cuda.is_available()", return_error=True)
@@ -491,7 +528,7 @@ def prepare_environment():
 
     if args.nunchaku and not _verify_nunchaku():
         try:
-            run_pip(f"install {nunchaku_package}", "nunchaku")
+            run_pip(f"install --no-deps {nunchaku_package}", "nunchaku")
         except RuntimeError:
             print("Failed to install nunchaku; Please manually install it")
         else:
@@ -549,7 +586,8 @@ def prepare_environment():
     run_extensions_installers(settings_file=args.ui_settings_file)
 
     if not requirements_met(requirements_file):
-        run_pip(f'install -U -r "{requirements_file}"', "requirements")
+        # only-if-needed: do not upgrade already-satisfied deps (esp. torch pulled by accelerate/etc.)
+        run_pip(f'install -U --upgrade-strategy only-if-needed -r "{requirements_file}"', "requirements")
         startup_timer.record("enforce requirements")
 
     if "--exit" in sys.argv:
