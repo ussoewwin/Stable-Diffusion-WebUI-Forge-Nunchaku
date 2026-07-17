@@ -68,6 +68,19 @@
 
   *Quicksettings 中的 `Attention` 下拉菜单（位于 Diffusion in Low Bits 旁）*
 
+- **Krea2 模型支持**
+  - ✅ **Krea2 的 Native Forge 支持**（SingleStreamDiT；例如 `moodyKreaMix_V33.safetensors`）
+  - Forge checkpoint 面板中的专用 **UI Preset: Krea2**
+  - 加载 **Additional modules**：`qwen_image_vae.safetensors`（VAE）、Qwen2-VL 文本编码器（例如 `Qwen2_VL_2B_Thinking_obliterated.safetensors`）
+  - 可与 **Attention** quicksettings 切换配合使用（`Default` / `SA2` / `SA3` / `FA2`），作用于 Comfy 路径的 Krea2 UNet
+  - 通过 `krea2_to_diffusers` 进行 LoRA 键映射
+
+  <p align="left">
+    <img src="../png/krea2.png" alt="Krea2 UI preset and txt2img example" width="400">
+  </p>
+
+  *Krea2 preset 工作流示例*
+
 - **Anima 模型支持**
   - ✅ **Anima 的 Native Forge 支持**（例如 `waiANIMA_pw3.safetensors`）
   - Forge checkpoint 面板中的专用 **UI Preset: Anima**

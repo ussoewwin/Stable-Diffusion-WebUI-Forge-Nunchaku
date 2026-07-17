@@ -68,6 +68,19 @@
 
   *`Attention` dropdown in quicksettings (next to Diffusion in Low Bits)*
 
+- **Krea2 Model Support**
+  - ✅ **Native Forge support for Krea2** (SingleStreamDiT; e.g. `moodyKreaMix_V33.safetensors`)
+  - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel
+  - Load **Additional modules**: `qwen_image_vae.safetensors` (VAE), Qwen2-VL text encoder (e.g. `Qwen2_VL_2B_Thinking_obliterated.safetensors`)
+  - Works with the **Attention** quicksettings switch (`Default` / `SA2` / `SA3` / `FA2`) on the Comfy-path Krea2 UNet
+  - LoRA key mapping via `krea2_to_diffusers`
+
+  <p align="left">
+    <img src="png/krea2.png" alt="Krea2 UI preset and txt2img example" width="400">
+  </p>
+
+  *Krea2 preset workflow example*
+
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
   - Dedicated **UI Preset: Anima** in the Forge checkpoint panel
