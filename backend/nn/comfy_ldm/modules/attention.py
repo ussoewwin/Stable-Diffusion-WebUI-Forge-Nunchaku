@@ -716,29 +716,45 @@ def attention_flash(q, k, v, heads, mask=None, attn_precision=None, skip_reshape
     return out
 
 
-optimized_attention = attention_basic
+# Stable dispatcher: import-time bindings stay valid after Attention UI switches.
+_optimized_attention_impl = attention_basic
 
 if model_management.sage_attention_enabled():
     logging.info("Using sage attention")
-    optimized_attention = attention_sage
+    _optimized_attention_impl = attention_sage
 elif model_management.xformers_enabled():
     logging.info("Using xformers attention")
-    optimized_attention = attention_xformers
+    _optimized_attention_impl = attention_xformers
 elif model_management.flash_attention_enabled():
     logging.info("Using Flash Attention")
-    optimized_attention = attention_flash
+    _optimized_attention_impl = attention_flash
 elif model_management.pytorch_attention_enabled():
     logging.info("Using pytorch attention")
-    optimized_attention = attention_pytorch
+    _optimized_attention_impl = attention_pytorch
 else:
     if args.use_split_cross_attention:
         logging.info("Using split optimization for attention")
-        optimized_attention = attention_split
+        _optimized_attention_impl = attention_split
     else:
         logging.info("Using sub quadratic optimization for attention, if you have memory or speed issues try using: --use-split-cross-attention")
-        optimized_attention = attention_sub_quad
+        _optimized_attention_impl = attention_sub_quad
 
-optimized_attention_masked = optimized_attention
+
+def optimized_attention(*args, **kwargs):
+    return _optimized_attention_impl(*args, **kwargs)
+
+
+def optimized_attention_masked(*args, **kwargs):
+    return _optimized_attention_impl(*args, **kwargs)
+
+
+def set_optimized_attention_impl(fn):
+    global _optimized_attention_impl
+    _optimized_attention_impl = fn
+
+
+def get_optimized_attention_impl():
+    return _optimized_attention_impl
 
 
 # register core-supported attention functions

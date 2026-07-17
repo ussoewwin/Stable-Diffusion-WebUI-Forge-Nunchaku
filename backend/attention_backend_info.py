@@ -1,5 +1,4 @@
-# Flash-Attention / SageAttention visibility + runtime switch for all Forge models
-# (SDXL, SD1.5, Flux, Qwen, Anima, Krea2, etc.).
+# Flash-Attention / SageAttention visibility + shared Attention UI runtime switch.
 # Detection helpers mirror ComfyUI-DistorchMemoryManager nodes/sa.py.
 # FA2 UI path follows A1111 md/FA2_direct_load_design.md:
 #   flash_attn_func directly (no xformers) → SDPA fallback → once-per-switch log.
@@ -285,9 +284,8 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     SA3 follows ComfyUI-DistorchMemoryManager nodes/sa.py sageattn3 path
     and Comfy ``attention3_sage`` (sageattn3_blackwell).
 
-    Rebinds Forge ``_attention_impl`` and Comfy ``_optimized_attention_impl``
-    via stable dispatchers so all already-imported call sites (SDXL UNet, Flux,
-    Krea2, Qwen, …) pick up the new backend without UNet reload.
+    Rebinds the shared Forge and Comfy Attention dispatchers so already-imported
+    call sites pick up the new backend without UNet reload.
     """
     mode = (mode or ATTENTION_UI_DEFAULT).strip()
     if mode not in ATTENTION_UI_CHOICES:
@@ -358,10 +356,24 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
         else:
             comfy_attention.optimized_attention = target
             comfy_attention.optimized_attention_masked = target
+
+        # Same shared dispatcher on Forge-tree Comfy attention copies (if imported).
+        for _mod_name in (
+            "backend.nn.comfy_ldm.modules.attention",
+            "backend.nn.comfy_ldm.modules.modules.attention",
+        ):
+            try:
+                import importlib
+
+                _m = importlib.import_module(_mod_name)
+                if hasattr(_m, "set_optimized_attention_impl"):
+                    _m.set_optimized_attention_impl(target)
+            except Exception:
+                pass
     except Exception as e:
         logging.warning("[Attention UI] comfy.ldm.modules.attention rebind failed: %s", e)
 
-    # Forge UNet / Flux / Qwen / SDXL / all backend.nn.* paths
+    # Shared Forge attention_function dispatcher
     try:
         import backend.attention as forge_attention
 

@@ -438,8 +438,7 @@ def attention_flash(q, k, v, heads, mask=None, attn_precision=None, skip_reshape
         return out.transpose(1, 2).reshape(b, -1, heads * dim_head)
 
 
-# Stable dispatcher: call sites that ``from backend.attention import attention_function``
-# keep working after runtime UI switches (SDXL / Flux / Qwen / all Forge UNets).
+# Stable dispatcher: shared Attention UI path for every import-time call site.
 _attention_impl = attention_basic
 
 if memory_management.sage_enabled():

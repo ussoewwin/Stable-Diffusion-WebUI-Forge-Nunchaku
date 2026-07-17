@@ -410,7 +410,7 @@ def on_preset_change(preset: str):
         gr.update(value=additional_modules),  # ui_vae
         gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
-        gr.update(visible=True, value=getattr(shared.opts, "forge_attention_backend", "Default")),  # ui_forge_attention — all presets
+        gr.update(visible=True, value=getattr(shared.opts, "forge_attention_backend", "Default")),  # shared Attention UI
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_async_loading", "Queue")),  # ui_forge_async_loading
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_pin_shared_memory", "CPU")),  # ui_forge_pin_shared_memory
         gr.update(visible=show_basic_mem, value=model_mem),  # ui_forge_inference_memory
