@@ -52,6 +52,22 @@
 
   *`Diffusion in Low Bits` dropdown: `int8` / `int8 (fp16 LoRA)` selection*
 
+- **Attention Backend Switch (Quicksettings)**
+  - ✅ **Runtime Attention backend selection** next to `Diffusion in Low Bits` in the Forge quicksettings bar
+  - Dropdown choices: `Default` / `SA2` / `SA3` / `FA2`
+    - `Default` — pytorch SDPA
+    - `SA2` — SageAttention 2
+    - `SA3` — SageAttention3 (Blackwell FP4), e.g. `3.0.0.b1` when installed
+    - `FA2` — Flash-Attention 2 called directly
+  - Applies on Comfy-path models (e.g. **Krea2** UI Preset) without reloading the UNet
+  - Logs the resolved backend with the full installed version string (not a short token only)
+
+  <p align="left">
+    <img src="png/attention.png" alt="Attention quicksettings dropdown: Default / SA2 / SA3 / FA2" width="400">
+  </p>
+
+  *`Attention` dropdown in quicksettings (next to Diffusion in Low Bits)*
+
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
   - Dedicated **UI Preset: Anima** in the Forge checkpoint panel

@@ -250,6 +250,19 @@ def clear_attention_log_once_flags():
         pass
 
 
+def reset_attention_forward_log():
+    """Allow [Krea2][Attention] backend= to print again on the next Generate (each job)."""
+    drop = [k for k in list(_logged_tags) if k.endswith("|first_forward")]
+    for k in drop:
+        _logged_tags.discard(k)
+    try:
+        import comfy.ldm.krea2.model as krea2_model
+
+        krea2_model._krea2_attn_logged = False
+    except Exception:
+        pass
+
+
 def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     """
     Runtime switch for SA2 / SA3 / FA2 / Default (pytorch SDPA).
@@ -360,27 +373,25 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
 def log_comfy_attention_backend(tag: str = "[Krea2]", transformer_options=None, once: bool = True, when: str = "load"):
     """
     Distarch-style FA/SA visibility. Log only — does not change attention selection.
+    When once=True and this (tag|when) already logged, still emit the backend= line.
     """
     key = f"{tag}|{when}"
-    if once and key in _logged_tags:
-        return
-    if once:
+    already = once and key in _logged_tags
+    if once and not already:
         _logged_tags.add(key)
 
     fn_name, source = resolve_active_attention(transformer_options)
     described = _describe_active(fn_name)
+
+    if already:
+        line = f"{tag}[Attention] backend={described}"
+        print(line)
+        logging.info(line)
+        return
+
     fa_ok, fa_ver, fa_type = get_flash_attention_info()
     sa_ver, cuda_ver, torch_ver = get_sage_attention_info()
     sa3_ver, sa3_ok, sa3_bw = get_sage_attention3_info()
-
-    use_flash = use_sage = None
-    try:
-        import comfy.model_management as cmm
-
-        use_flash = cmm.flash_attention_enabled()
-        use_sage = cmm.sage_attention_enabled()
-    except Exception:
-        pass
 
     lines = [
         f"{tag}[Attention] when={when} active_fn={fn_name} source={source} → {described}",
@@ -394,7 +405,7 @@ def log_comfy_attention_backend(tag: str = "[Krea2]", transformer_options=None, 
             + (f" {sa3_ver}" if sa3_ok and sa3_ver else "")
             + (" Blackwell" if sa3_bw else "")
         ),
-        f"{tag}[Attention] flags: sage_attention_enabled={use_sage} flash_attention_enabled={use_flash}",
+        f"{tag}[Attention] backend={described}",
     ]
     for line in lines:
         print(line)

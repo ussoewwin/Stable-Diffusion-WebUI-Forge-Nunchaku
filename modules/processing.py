@@ -866,6 +866,13 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 def process_images_inner(p: StableDiffusionProcessing) -> Processed:
     """this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch"""
 
+    try:
+        from backend.attention_backend_info import reset_attention_forward_log
+
+        reset_attention_forward_log()
+    except Exception:
+        pass
+
     _is_video = False
     video_path = None
     if shared.sd_model.is_wan:
