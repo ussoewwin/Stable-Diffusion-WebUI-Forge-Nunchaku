@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.8.0
+
+- **INT8 (Low Bits) UNet quantization for SDXL and Z-Image**
+  - New **`int8`** / **`int8 (fp16 LoRA)`** entries in the **`Diffusion in Low Bits`** dropdown enable tensor-wise INT8 (`int8_tensorwise`) UNet storage for reduced VRAM usage; selected explicitly, never auto-detected.
+  - **`int8`** bakes LoRA into the INT8 weights, while **`int8 (fp16 LoRA)`** keeps LoRA in FP16 for online (bake-free) application.
+  - INT8 loading is fully separated from the float8 / bnb / Automatic paths; every non-`int8` dropdown entry uses a different loading branch.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.0) for details.
+
 ## Version 1.7.9
 
 - **Anima Hires Fix: tiled second pass for high-resolution upscale**
