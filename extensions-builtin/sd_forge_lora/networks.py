@@ -44,19 +44,6 @@ def load_lora_for_models(model: "UnetPatcher", clip, lora, strength_model, stren
         except ImportError:
             pass
 
-    # Check for Nunchaku SDXL models - detected by SVDQUNet2DConditionModel instance
-    if hasattr(model.model, "diffusion_model"):
-        try:
-            from backend.nn.nunchaku_sdxl_unet import SVDQUNet2DConditionModel
-            if isinstance(model.model.diffusion_model, SVDQUNet2DConditionModel):
-                # Ensure loras attribute exists (same format: (lora_path, strength))
-                if not hasattr(model.model.diffusion_model, "loras"):
-                    model.model.diffusion_model.loras = []
-                model.model.diffusion_model.loras.append((filename, strength_model))
-                return model, clip
-        except ImportError:
-            pass
-    
     # Check for ZIT models (both Nunchaku and standard) - detected by NextDiT instance
     if hasattr(model.model, "diffusion_model"):
         from comfy.ldm.lumina.model import NextDiT
@@ -156,9 +143,13 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
             continue
 
     online_mode = dynamic_args.get("online_lora", False)
+    storage_dtype = current_sd.forge_objects.unet.model.storage_dtype
 
-    if current_sd.forge_objects.unet.model.storage_dtype in [torch.float32, torch.float16, torch.bfloat16]:
+    # FP storage: offline bake. int8_tensorwise: follow UI (True only for "int8 (fp16 LoRA)").
+    if storage_dtype in [torch.float32, torch.float16, torch.bfloat16]:
         online_mode = False
+    elif storage_dtype == "int8_tensorwise":
+        online_mode = bool(dynamic_args.get("online_lora", False))
 
     compiled_lora_targets = []
     for a, b, c in zip(networks_on_disk, unet_multipliers, te_multipliers):
@@ -192,17 +183,6 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
         try:
             from backend.nn.svdq import SVDQFluxTransformer2DModel
             if isinstance(current_sd.forge_objects.unet.model.diffusion_model, SVDQFluxTransformer2DModel):
-                if not hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
-                    current_sd.forge_objects.unet.model.diffusion_model.loras = []
-                current_sd.forge_objects.unet.model.diffusion_model.loras.clear()
-        except ImportError:
-            pass
-
-    # Clear loras for Nunchaku SDXL models
-    if hasattr(current_sd.forge_objects.unet.model, "diffusion_model"):
-        try:
-            from backend.nn.nunchaku_sdxl_unet import SVDQUNet2DConditionModel
-            if isinstance(current_sd.forge_objects.unet.model.diffusion_model, SVDQUNet2DConditionModel):
                 if not hasattr(current_sd.forge_objects.unet.model.diffusion_model, "loras"):
                     current_sd.forge_objects.unet.model.diffusion_model.loras = []
                 current_sd.forge_objects.unet.model.diffusion_model.loras.clear()

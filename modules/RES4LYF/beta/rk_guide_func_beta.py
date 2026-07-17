@@ -60,7 +60,6 @@ class LatentGuide:
         model_sampling_path = None
         is_nunchaku_qwen_image = False
         is_nunchaku_flux1 = False
-        is_nunchaku_sdxl = False
         is_sdxl = False
         
         # First, try Forge path (ForgeDiffusionEngine has forge_objects)
@@ -78,13 +77,10 @@ class LatentGuide:
                             # Check if it's Nunchaku Qwen Image, FLUX1, or SDXL
                             try:
                                 from backend.nn.svdq import SVDQFluxTransformer2DModel, NunchakuQwenImageTransformer2DModel
-                                from backend.nn.nunchaku_sdxl_unet import SVDQUNet2DConditionModel
                                 if isinstance(diffusion_model, NunchakuQwenImageTransformer2DModel):
                                     is_nunchaku_qwen_image = True
                                 elif isinstance(diffusion_model, SVDQFluxTransformer2DModel):
                                     is_nunchaku_flux1 = True
-                                elif isinstance(diffusion_model, SVDQUNet2DConditionModel):
-                                    is_nunchaku_sdxl = True
                                 else:
                                     # Check if it's standard SDXL (IntegratedUNet2DConditionModel or UNet2DConditionModel)
                                     try:
@@ -104,8 +100,6 @@ class LatentGuide:
                                 model_type_str = "Nunchaku QwenImage"
                             elif is_nunchaku_flux1:
                                 model_type_str = "Nunchaku FLUX1"
-                            elif is_nunchaku_sdxl:
-                                model_type_str = "Nunchaku SDXL"
                             elif is_sdxl:
                                 model_type_str = "SDXL"
                             else:
@@ -131,8 +125,6 @@ class LatentGuide:
                 model_type_str = "Nunchaku QwenImage"
             elif is_nunchaku_flux1:
                 model_type_str = "Nunchaku FLUX1"
-            elif is_nunchaku_sdxl:
-                model_type_str = "Nunchaku SDXL"
             elif is_sdxl:
                 model_type_str = "SDXL"
             else:
