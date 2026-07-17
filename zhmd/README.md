@@ -32,6 +32,26 @@
   - 健壮的变更检测，正确处理模型重载
   - AWQ 量化层处理及安全开关
 
+- **INT8（Low Bits）UNet 量化**
+  - ✅ **对 SDXL 和 Z-Image 的 INT8 UNet 支持**
+  - 在 Forge 设置面板的 **`Diffusion in Low Bits` 下拉菜单** 中显式选择，绝不自动检测。完整菜单如下：
+    - `Automatic` — 不强制存储 dtype（默认；**非** INT8）
+    - `Automatic (fp16 LoRA)` — 与 `Automatic` 相同，LoRA 保留为 FP16
+    - `float8-e4m3fn` / `float8-e4m3fn (fp16 LoRA)` — FP8 存储路径
+    - **`int8`** — INT8 UNet，LoRA 烘焙进 INT8 权重
+    - **`int8 (fp16 LoRA)`** — INT8 UNet，LoRA 保留为 FP16，用于在线（免烘焙）应用
+    - `bnb-nf4` / `bnb-fp4`（及其 `(fp16 LoRA)` 变体）— 仅在可用 bitsandbytes 时显示
+  - 仅 **`int8`** / **`int8 (fp16 LoRA)`** 两个选项启用 INT8；其他所有选项使用不同的加载路径
+  - Tensor-wise INT8 存储（`int8_tensorwise`），降低显存占用
+  - `int8 (fp16 LoRA)` 将 LoRA 保留为 FP16，用于在线（免烘焙）应用
+  - 与 float8 / bnb / Automatic 加载路径完全分离
+
+  <p align="left">
+    <img src="../png/int8.png" alt="Diffusion in Low Bits dropdown with int8 options" width="400">
+  </p>
+
+  *`Diffusion in Low Bits` 下拉菜单：`int8` / `int8 (fp16 LoRA)` 选择*
+
 - **Anima 模型支持**
   - ✅ **Anima 的 Native Forge 支持**（例如 `waiANIMA_pw3.safetensors`）
   - Forge checkpoint 面板中的专用 **UI Preset: Anima**
