@@ -32,6 +32,13 @@
   - Robust change detection to handle model reloads correctly
   - AWQ quantization layer handling with safety switch
 
+- **INT8 (Low Bits) UNet Quantization**
+  - ✅ **INT8 UNet support for SDXL and Z-Image**
+  - Selected explicitly via the **UI "Low Bits" dropdown** (`int8` / `int8 (fp16 LoRA)`), never auto-detected
+  - Tensor-wise INT8 storage (`int8_tensorwise`) for reduced VRAM usage
+  - `int8 (fp16 LoRA)` keeps LoRA in FP16 for online (bake-free) application
+  - Fully separated from the float8 / bnb / Automatic loading paths
+
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
   - Dedicated **UI Preset: Anima** in the Forge checkpoint panel
