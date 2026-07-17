@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.8.0
+
+- **面向 SDXL 与 Z-Image 的 INT8（Low Bits）UNet 量化**
+  - 在 **`Diffusion in Low Bits`** 下拉菜单中新增 **`int8`** / **`int8 (fp16 LoRA)`** 选项，启用 tensor-wise INT8（`int8_tensorwise`）UNet 存储以降低显存占用；需显式选择，绝不自动检测。
+  - **`int8`** 将 LoRA 烘焙进 INT8 权重，而 **`int8 (fp16 LoRA)`** 将 LoRA 保留为 FP16 以进行在线（免烘焙）应用。
+  - INT8 加载与 float8 / bnb / Automatic 路径完全分离；每个非 `int8` 下拉选项都使用不同的加载分支。
+  - 详情请参阅 [Release Notes（中文）](v1.8.0.md)。
+
 ## Version 1.7.9
 
 - **Anima Hires Fix：高分辨率放大时的分块二次采样**
