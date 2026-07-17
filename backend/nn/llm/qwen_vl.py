@@ -7,16 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from backend.memory_management import (
-    is_device_cpu,
-    text_encoder_device,
-    xformers_enabled,
-)
-
-if xformers_enabled() and not is_device_cpu(text_encoder_device()):
-    from backend.attention import attention_xformers as attention_function
-else:
-    from backend.attention import attention_pytorch as attention_function
+from backend.attention import attention_function
 
 
 def process_qwen2vl_images(

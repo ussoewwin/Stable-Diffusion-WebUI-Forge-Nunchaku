@@ -1,4 +1,5 @@
-# Flash-Attention / SageAttention visibility + runtime switch for Comfy-path models (Krea2 etc.).
+# Flash-Attention / SageAttention visibility + runtime switch for all Forge models
+# (SDXL, SD1.5, Flux, Qwen, Anima, Krea2, etc.).
 # Detection helpers mirror ComfyUI-DistorchMemoryManager nodes/sa.py.
 # FA2 UI path follows A1111 md/FA2_direct_load_design.md:
 #   flash_attn_func directly (no xformers) → SDPA fallback → once-per-switch log.
@@ -185,8 +186,9 @@ def get_sage_attention3_info():
 
 def resolve_active_attention(transformer_options=None):
     """
-    Resolve the attention callable Comfy will actually run.
-    Returns (fn_name, source) where source is 'override' or 'global'.
+    Resolve the attention callable that will actually run.
+    Prefers Comfy optimized_attention when present; else Forge attention_function.
+    Returns (fn_name, source) where source is 'override', 'comfy', 'forge', or 'error'.
     """
     if transformer_options:
         override = transformer_options.get("optimized_attention_override")
@@ -195,8 +197,21 @@ def resolve_active_attention(transformer_options=None):
     try:
         from comfy.ldm.modules import attention as comfy_attention
 
-        fn = comfy_attention.optimized_attention
-        return getattr(fn, "__name__", str(fn)), "global"
+        if hasattr(comfy_attention, "get_optimized_attention_impl"):
+            fn = comfy_attention.get_optimized_attention_impl()
+        else:
+            fn = comfy_attention.optimized_attention
+        return getattr(fn, "__name__", str(fn)), "comfy"
+    except Exception:
+        pass
+    try:
+        import backend.attention as forge_attention
+
+        if hasattr(forge_attention, "get_attention_impl"):
+            fn = forge_attention.get_attention_impl()
+        else:
+            fn = forge_attention.attention_function
+        return getattr(fn, "__name__", str(fn)), "forge"
     except Exception as e:
         return f"<unresolved:{e}>", "error"
 
@@ -251,7 +266,7 @@ def clear_attention_log_once_flags():
 
 
 def reset_attention_forward_log():
-    """Allow [Krea2][Attention] backend= to print again on the next Generate (each job)."""
+    """Allow per-Generate Attention backend= lines to print again on the next job."""
     drop = [k for k in list(_logged_tags) if k.endswith("|first_forward")]
     for k in drop:
         _logged_tags.discard(k)
@@ -270,8 +285,9 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     SA3 follows ComfyUI-DistorchMemoryManager nodes/sa.py sageattn3 path
     and Comfy ``attention3_sage`` (sageattn3_blackwell).
 
-    Updates Comfy CLI flags + rebinds optimized_attention, and Forge backend.attention_function.
-    Does not reload the UNet; next forward uses the new backend.
+    Rebinds Forge ``_attention_impl`` and Comfy ``_optimized_attention_impl``
+    via stable dispatchers so all already-imported call sites (SDXL UNet, Flux,
+    Krea2, Qwen, …) pick up the new backend without UNet reload.
     """
     mode = (mode or ATTENTION_UI_DEFAULT).strip()
     if mode not in ATTENTION_UI_CHOICES:
@@ -301,7 +317,6 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     use_flash = mode == "FA2"
     use_sage3 = mode == "SA3"
 
-    # ComfyUI-master path (Krea2 / optimized_attention_masked)
     try:
         from comfy.cli_args import args as comfy_args
 
@@ -312,6 +327,8 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     except Exception as e:
         logging.warning("[Attention UI] comfy.cli_args update failed: %s", e)
 
+    label = mode
+    target = None
     try:
         import comfy.ldm.modules.attention as comfy_attention
 
@@ -330,32 +347,41 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
             target = comfy_attention.attention_sage
             label = "SageAttention (SA2)"
         elif use_flash:
-            # A1111 FA2 direct-load (flash_attn_func), not Comfy custom_op / xformers
             target = attention_fa2_direct
             label = f"{fa_type or 'FA-2'} (Flash-Attention {fa_ver or '?'}) called directly"
         else:
             target = comfy_attention.attention_pytorch
             label = "pytorch SDPA (Default)"
 
-        comfy_attention.optimized_attention = target
-        comfy_attention.optimized_attention_masked = target
+        if hasattr(comfy_attention, "set_optimized_attention_impl"):
+            comfy_attention.set_optimized_attention_impl(target)
+        else:
+            comfy_attention.optimized_attention = target
+            comfy_attention.optimized_attention_masked = target
     except Exception as e:
         logging.warning("[Attention UI] comfy.ldm.modules.attention rebind failed: %s", e)
-        label = mode
 
-    # Forge classic / non-Comfy UNet path
+    # Forge UNet / Flux / Qwen / SDXL / all backend.nn.* paths
     try:
         import backend.attention as forge_attention
-        import comfy.ldm.modules.attention as comfy_attention
 
-        if use_sage3 and hasattr(comfy_attention, "attention3_sage"):
-            forge_attention.attention_function = comfy_attention.attention3_sage
-        elif use_sage and hasattr(forge_attention, "attention_sage"):
-            forge_attention.attention_function = forge_attention.attention_sage
-        elif use_flash:
-            forge_attention.attention_function = attention_fa2_direct
-        elif hasattr(forge_attention, "attention_pytorch"):
-            forge_attention.attention_function = forge_attention.attention_pytorch
+        if target is None:
+            if use_sage3:
+                import comfy.ldm.modules.attention as comfy_attention
+
+                target = comfy_attention.attention3_sage
+            elif use_sage and hasattr(forge_attention, "attention_sage"):
+                target = forge_attention.attention_sage
+            elif use_flash:
+                target = attention_fa2_direct
+            elif hasattr(forge_attention, "attention_pytorch"):
+                target = forge_attention.attention_pytorch
+
+        if target is not None:
+            if hasattr(forge_attention, "set_attention_impl"):
+                forge_attention.set_attention_impl(target)
+            else:
+                forge_attention.attention_function = target
     except Exception as e:
         logging.warning("[Attention UI] backend.attention rebind failed: %s", e)
 
@@ -370,7 +396,7 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
     return mode
 
 
-def log_comfy_attention_backend(tag: str = "[Krea2]", transformer_options=None, once: bool = True, when: str = "load"):
+def log_comfy_attention_backend(tag: str = "[Attention]", transformer_options=None, once: bool = True, when: str = "load"):
     """
     Distarch-style FA/SA visibility. Log only — does not change attention selection.
     When once=True and this (tag|when) already logged, still emit the backend= line.

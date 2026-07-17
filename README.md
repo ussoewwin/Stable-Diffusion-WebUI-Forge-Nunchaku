@@ -59,7 +59,7 @@
     - `SA2` — SageAttention 2
     - `SA3` — SageAttention3 (Blackwell FP4), e.g. `3.0.0.b1` when installed
     - `FA2` — Flash-Attention 2 called directly
-  - Applies on Comfy-path models without reloading the UNet
+  - Applies to **all** Forge models (SD1.5 / SDXL / Flux / Qwen / Anima / Krea2 / …) without reloading the UNet
   - Logs the resolved backend with the full installed version string (not a short token only)
 
   <p align="left">

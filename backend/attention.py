@@ -438,8 +438,12 @@ def attention_flash(q, k, v, heads, mask=None, attn_precision=None, skip_reshape
         return out.transpose(1, 2).reshape(b, -1, heads * dim_head)
 
 
+# Stable dispatcher: call sites that ``from backend.attention import attention_function``
+# keep working after runtime UI switches (SDXL / Flux / Qwen / all Forge UNets).
+_attention_impl = attention_basic
+
 if memory_management.sage_enabled():
-    attention_function = attention_sage
+    _attention_impl = attention_sage
     match args.sage2_function:
         case SageAttentionFuncs.auto:
             print(f"Using SageAttention {'2' if IS_SAGE_2 else ''}")
@@ -452,19 +456,33 @@ if memory_management.sage_enabled():
 
 elif memory_management.flash_enabled():
     print("Using FlashAttention")
-    attention_function = attention_flash
+    _attention_impl = attention_flash
 elif memory_management.xformers_enabled():
     print("Using xformers Cross Attention")
-    attention_function = attention_xformers
+    _attention_impl = attention_xformers
 elif memory_management.pytorch_attention_enabled():
     print("Using PyTorch Cross Attention")
-    attention_function = attention_pytorch
+    _attention_impl = attention_pytorch
 elif args.attention_split:
     print("Using Split Optimization for Cross Attention")
-    attention_function = attention_split
+    _attention_impl = attention_split
 else:
     print("Using Basic Cross Attention")
-    attention_function = attention_basic
+    _attention_impl = attention_basic
+
+
+def attention_function(*args, **kwargs):
+    return _attention_impl(*args, **kwargs)
+
+
+def set_attention_impl(fn):
+    """Runtime Attention UI: rebind without breaking import-time call sites."""
+    global _attention_impl
+    _attention_impl = fn
+
+
+def get_attention_impl():
+    return _attention_impl
 
 
 # ========== VAE ========== #

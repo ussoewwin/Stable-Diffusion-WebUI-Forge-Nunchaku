@@ -59,7 +59,7 @@
     - `SA2` — SageAttention 2
     - `SA3` — SageAttention3（Blackwell FP4），已安装时例如 `3.0.0.b1`
     - `FA2` — 直接调用 Flash-Attention 2
-  - 适用于 Comfy 路径模型，无需重新加载 UNet
+  - 适用于 **全部** Forge 模型（SD1.5 / SDXL / Flux / Qwen / Anima / Krea2 / …），无需重新加载 UNet
   - 日志输出已解析后端的完整版本字符串（不仅是缩写）
 
   <p align="left">

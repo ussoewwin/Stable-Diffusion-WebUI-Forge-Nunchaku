@@ -7,16 +7,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from backend.memory_management import (
-    is_device_cpu,
-    text_encoder_device,
-    xformers_enabled,
-)
-
-if xformers_enabled() and not is_device_cpu(text_encoder_device()):
-    from backend.attention import attention_xformers as attention_function
-else:
-    from backend.attention import attention_pytorch as attention_function
+from backend.attention import attention_function
 
 from . import qwen_vl
 
