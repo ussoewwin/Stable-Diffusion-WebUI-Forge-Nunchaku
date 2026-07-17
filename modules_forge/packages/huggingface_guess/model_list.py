@@ -542,6 +542,86 @@ class Anima(AnimaBase):
         return True
 
 
+class Krea2(BASE):
+    """Krea 2 (K2): Comfy ``SingleStreamDiT`` UNet + Qwen3-VL-4B TE + Wan VAE.
+
+    Mirrors ``comfy.supported_models.Krea2``. ``model_type`` is ``FLUX`` (like Flux1) so
+    the Comfy-side ``model_sampling`` is ``ModelSamplingFlux(shift=1.15)``. Detection is
+    key-disjoint from Flux (``txtfusion.projector.weight`` vs ``double_blocks.*``).
+    """
+
+    huggingface_repo = "krea2"
+
+    unet_config = {
+        "image_model": "krea2",
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 1.15,
+    }
+
+    unet_extra_config = {}
+    required_keys = {}
+
+    unet_key_prefix = ["model.diffusion_model."]
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    memory_usage_factor = 2.2
+    supported_inference_dtypes = [torch.bfloat16, torch.float16, torch.float32]
+
+    latent_format = latent.Wan21
+
+    @classmethod
+    def matches(cls, unet_config, state_dict=None):
+        if unet_config.get("image_model") != "krea2":
+            return False
+        return True
+
+    def model_type(self, state_dict):
+        return ModelType.FLUX
+
+    def process_clip_state_dict(self, state_dict):
+        pref = self.text_encoder_key_prefix[0]
+        if any(k.startswith(pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {pref: ""}, filter_keys=True)
+        comfy_pref = "cond_stage_model."
+        if any(k.startswith(comfy_pref) for k in state_dict):
+            return utils.state_dict_prefix_replace(state_dict, {comfy_pref: ""}, filter_keys=True)
+        if any(k.startswith("qwen3vl_4b.") for k in state_dict):
+            return state_dict
+        return super().process_clip_state_dict(state_dict)
+
+    @classmethod
+    def te_filter_prefixes(cls, clip_key: str) -> list[str]:
+        pref = cls.text_encoder_key_prefix[0]
+        return [
+            clip_key + ".",
+            pref + clip_key + ".",
+            "cond_stage_model." + clip_key + ".",
+        ]
+
+    def clip_target(self, state_dict: dict):
+        pref = self.text_encoder_key_prefix[0]
+        comfy_pref = "cond_stage_model."
+        embed = "model.embed_tokens.weight"
+        checks = (
+            (f"{pref}qwen3vl_4b.transformer", "qwen3vl_4b.transformer"),
+            (f"{pref}qwen3vl_4b", "qwen3vl_4b"),
+            (f"{comfy_pref}qwen3vl_4b.transformer", "cond_stage_model.qwen3vl_4b.transformer"),
+            (f"{comfy_pref}qwen3vl_4b", "cond_stage_model.qwen3vl_4b"),
+            ("qwen3vl_4b.transformer", "qwen3vl_4b.transformer"),
+            ("qwen3vl_4b", "qwen3vl_4b"),
+        )
+        for prefix, target in checks:
+            if f"{prefix}.{embed}" in state_dict or any(k.startswith(f"{prefix}.") for k in state_dict):
+                return {target: "text_encoder"}
+        return {}
+
+
 class ZImageBase(Lumina2):
     """Z-Image Base (dim=1920, smaller). Compatible with ComfyUI-master NextDiT."""
 
@@ -636,4 +716,5 @@ models = [
     AnimaWai68,
     AnimaBase,
     Anima,
+    Krea2,
 ]

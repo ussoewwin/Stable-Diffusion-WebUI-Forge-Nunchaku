@@ -22,7 +22,7 @@ import torch
 
 from modules_forge.packages.comfy import weight_adapter
 
-from .utils import flux_to_diffusers, unet_to_diffusers, z_image_to_diffusers
+from .utils import flux_to_diffusers, krea2_to_diffusers, unet_to_diffusers, z_image_to_diffusers
 
 LORA_CLIP_MAP = {
     "mlp.fc1": "mlp_fc1",
@@ -235,5 +235,17 @@ def model_lora_keys_unet(model, key_map={}):
                 key_lora = k[: -len(".weight")]
                 key_map["diffusion_model.{}".format(key_lora)] = to
                 key_map["lycoris_{}".format(key_lora.replace(".", "_"))] = to
+
+    # Forge guess uses huggingface_repo="krea2"; Neo/Comfy may use "krea-2".
+    if "krea2" in _model_name or "krea-2" in _model_name:
+        diffusers_keys = krea2_to_diffusers(model.diffusion_model.config, output_prefix="diffusion_model.")
+        for k in diffusers_keys:
+            if k.endswith(".weight"):
+                to = diffusers_keys[k]
+                key_lora = k[: -len(".weight")]
+                key_map["diffusion_model.{}".format(key_lora)] = to
+                key_map["transformer.{}".format(key_lora)] = to
+                key_map["lycoris_{}".format(key_lora.replace(".", "_"))] = to
+                key_map[key_lora] = to
 
     return key_map

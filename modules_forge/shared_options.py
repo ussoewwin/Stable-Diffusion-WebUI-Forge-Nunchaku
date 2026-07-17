@@ -9,6 +9,7 @@ def register(options_templates, options_section, OptionInfo):
                 "forge_inference_memory": OptionInfo(1024),
                 "forge_async_loading": OptionInfo("Queue"),
                 "forge_pin_shared_memory": OptionInfo("CPU"),
+                "forge_attention_backend": OptionInfo("Default"),
                 "forge_preset": OptionInfo("sd"),
                 "forge_additional_modules": OptionInfo([]),
             },

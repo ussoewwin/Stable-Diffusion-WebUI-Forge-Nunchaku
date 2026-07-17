@@ -186,6 +186,11 @@ class LoraLoader:
         set_parameter_devices(self.model, parameter_devices=parameter_devices)
 
         # Patch
+        n_online = 0
+        n_mp_quant = 0  # convert_weight → merge → set_weight (ComfyUI MixedPrecision)
+        n_legacy = 0  # float / BnB / GGUF offline merge
+        sample_mp = None
+        import comfy.utils as comfy_utils
 
         for (key, online_mode), current_patches in all_patches.items():
             try:
@@ -200,10 +205,68 @@ class LoraLoader:
 
                 parent_layer.forge_online_loras[child_key] = current_patches
                 self.online_backup.append(parent_layer)
+                n_online += 1
                 continue
 
             if key not in self.backup:
                 self.backup[key] = weight.to(device=offload_device)
+
+            # MixedPrecision QuantizedTensor only (Krea2 comfy_quant / similar).
+            # Plain float Linear / BnB / GGUF keep the legacy path below — no behavior change.
+            convert_func = getattr(parent_layer, "convert_{}".format(child_key), None)
+            set_func = getattr(parent_layer, "set_{}".format(child_key), None)
+            use_mp_quant_lora = False
+            layout_type = getattr(parent_layer, "layout_type", None)
+            weight_kind = type(weight.data if hasattr(weight, "data") else weight).__name__
+            if layout_type is not None and convert_func is not None and set_func is not None:
+                use_mp_quant_lora = True
+            else:
+                try:
+                    from comfy.quant_ops import QuantizedTensor
+
+                    raw = weight.data if hasattr(weight, "data") else weight
+                    if isinstance(weight, QuantizedTensor) or isinstance(raw, QuantizedTensor):
+                        if convert_func is not None and set_func is not None:
+                            use_mp_quant_lora = True
+                            weight_kind = type(raw).__name__
+                except Exception:
+                    pass
+
+            if use_mp_quant_lora:
+                # ComfyUI-master: dequantize → merge → requantize via set_weight.
+                # Offline .to(float32) on QuantizedTensor does not apply LoRA correctly.
+                weight_f = convert_func(weight)
+                if sample_mp is None:
+                    sample_mp = (
+                        key,
+                        weight_kind,
+                        layout_type,
+                        type(weight_f).__name__,
+                        getattr(weight_f, "dtype", None),
+                        tuple(weight_f.shape) if hasattr(weight_f, "shape") else None,
+                    )
+                    print(
+                        "[LORA] MixedPrecision path (Comfy convert→merge→set): "
+                        f"key={key} storage={weight_kind} layout={layout_type} "
+                        f"dequant={type(weight_f).__name__}/{getattr(weight_f, 'dtype', None)} "
+                        f"shape={getattr(weight_f, 'shape', None)}"
+                    )
+                try:
+                    weight_f = merge_lora_to_weight(current_patches, weight_f, key, computation_dtype=torch.float32)
+                except Exception:
+                    print("Patching LoRA weights out of memory. Retrying by offloading models.")
+                    set_parameter_devices(self.model, parameter_devices={k: offload_device for k in parameter_devices.keys()})
+                    memory_management.soft_empty_cache()
+                    weight_f = merge_lora_to_weight(current_patches, weight_f, key, computation_dtype=torch.float32)
+                # ComfyUI-master model_patcher.patch_weight_to_device: seed must be int.
+                # set_weight(..., seed=None) → stochastic_rounding=None → TypeError on `> 0`.
+                set_func(
+                    weight_f,
+                    inplace_update=False,
+                    seed=comfy_utils.string_to_seed(key),
+                )
+                n_mp_quant += 1
+                continue
 
             bnb_layer = None
 
@@ -232,15 +295,35 @@ class LoraLoader:
 
             if bnb_layer is not None:
                 bnb_layer.reload_weight(weight)
+                n_legacy += 1
                 continue
 
             if gguf_cls is not None:
                 gguf_cls.quantize_pytorch(weight, gguf_parameter)
+                n_legacy += 1
                 continue
 
             utils.set_attr_raw(self.model, key, torch.nn.Parameter(weight, requires_grad=False))
+            n_legacy += 1
 
         # End
+        total = n_online + n_mp_quant + n_legacy
+        if total > 0:
+            print(
+                "[LORA] refresh apply summary: "
+                f"online={n_online} "
+                f"mixed_precision_convert_merge_set={n_mp_quant} "
+                f"legacy_offline_merge={n_legacy} "
+                f"(total={total})"
+            )
+            if n_mp_quant > 0:
+                print(
+                    "[LORA] flow: QuantizedTensor → convert_weight(dequant) → "
+                    "merge_lora_to_weight(fp32) → set_weight(requantize)  "
+                    f"[keys={n_mp_quant}]"
+                )
+            if n_legacy > 0 and n_mp_quant == 0:
+                print("[LORA] flow: Parameter → merge_lora_to_weight(fp32) → write back (legacy)")
 
         set_parameter_devices(self.model, parameter_devices=parameter_devices)
         self.loaded_hash = hashes

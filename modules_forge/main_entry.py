@@ -21,6 +21,7 @@ FORGE_UI_PRESET_CHOICES = [
     ("Qwen", "qwen"),
     ("Lumina", "lumina"),
     ("Anima", "anima"),
+    ("Krea2", "krea2"),
 ]
 
 FORGE_UI_PRESET_VALUES = [v for _, v in FORGE_UI_PRESET_CHOICES]
@@ -33,6 +34,7 @@ ui_forge_unet_storage_dtype_options: gr.Radio = None
 ui_forge_async_loading: gr.Radio = None
 ui_forge_pin_shared_memory: gr.Radio = None
 ui_forge_inference_memory: gr.Slider = None
+ui_forge_attention: gr.Dropdown = None
 
 
 forge_unet_storage_dtype_options = {
@@ -40,6 +42,8 @@ forge_unet_storage_dtype_options = {
     "Automatic (fp16 LoRA)": (None, True),
     "float8-e4m3fn": (torch.float8_e4m3fn, False),
     "float8-e4m3fn (fp16 LoRA)": (torch.float8_e4m3fn, True),
+    "int8": ("int8_tensorwise", False),
+    "int8 (fp16 LoRA)": ("int8_tensorwise", True),
 }
 
 bnb_storage_dtype_options = {
@@ -67,7 +71,7 @@ def bind_to_opts(comp, k, save=False, callback=None):
 
 
 def make_checkpoint_manager_ui():
-    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_preset
+    global ui_checkpoint, ui_vae, ui_clip_skip, ui_forge_unet_storage_dtype_options, ui_forge_async_loading, ui_forge_pin_shared_memory, ui_forge_inference_memory, ui_forge_attention, ui_forge_preset
 
     if shared.opts.sd_model_checkpoint in [None, "None", "none", ""]:
         if len(sd_models.checkpoints_list) == 0:
@@ -96,24 +100,59 @@ def make_checkpoint_manager_ui():
     refresh_button.click(fn=gr_refresh_models, outputs=[ui_checkpoint, ui_vae], queue=False)
 
     def gr_refresh_on_load():
+        from backend.attention_backend_info import apply_attention_backend
+
         ckpt_list, vae_list = refresh_models()
         refresh_memory_management_settings()
+        apply_attention_backend(getattr(shared.opts, "forge_attention_backend", "Default"), log=True)
         return [gr.update(value=shared.opts.sd_model_checkpoint, choices=ckpt_list), gr.update(value=[os.path.basename(x) for x in shared.opts.forge_additional_modules], choices=vae_list)]
 
     Context.root_block.load(fn=gr_refresh_on_load, outputs=[ui_checkpoint, ui_vae], show_progress=False, queue=False)
 
-    ui_forge_unet_storage_dtype_options = gr.Dropdown(label="Diffusion in Low Bits", value=lambda: shared.opts.forge_unet_storage_dtype, choices=list(forge_unet_storage_dtype_options.keys()))
+    # Parent is already gr.Row(#quicksettings). Nested Row wraps Attention under Diffusion.
+    from backend.attention_backend_info import ATTENTION_UI_CHOICES
+
+    ui_forge_unet_storage_dtype_options = gr.Dropdown(
+        label="Diffusion in Low Bits",
+        value=lambda: shared.opts.forge_unet_storage_dtype,
+        choices=list(forge_unet_storage_dtype_options.keys()),
+    )
     bind_to_opts(ui_forge_unet_storage_dtype_options, "forge_unet_storage_dtype", save=True, callback=refresh_model_loading_parameters)
+
+    ui_forge_attention = gr.Dropdown(
+        label="Attention",
+        value=lambda: getattr(shared.opts, "forge_attention_backend", "Default"),
+        choices=list(ATTENTION_UI_CHOICES),
+        elem_id="forge_attention_backend",
+        scale=0,
+        min_width=120,
+    )
 
     ui_forge_async_loading = gr.Radio(label="Swap Method", value=lambda: shared.opts.forge_async_loading, choices=["Queue", "Async"])
     ui_forge_pin_shared_memory = gr.Radio(label="Swap Location", value=lambda: shared.opts.forge_pin_shared_memory, choices=["CPU", "Shared"])
-    ui_forge_inference_memory = gr.Slider(label="GPU Weights (MB)", value=lambda: total_vram - shared.opts.forge_inference_memory, minimum=0, maximum=int(memory_management.total_vram), step=1)
+
+    ui_forge_inference_memory = gr.Slider(
+        label="GPU Weights (MB)",
+        value=lambda: total_vram - shared.opts.forge_inference_memory,
+        minimum=0,
+        maximum=int(memory_management.total_vram),
+        step=1,
+    )
 
     mem_comps = [ui_forge_inference_memory, ui_forge_async_loading, ui_forge_pin_shared_memory]
 
     ui_forge_inference_memory.change(ui_refresh_memory_management_settings, inputs=mem_comps, queue=False, show_progress=False)
     ui_forge_async_loading.change(ui_refresh_memory_management_settings, inputs=mem_comps, queue=False, show_progress=False)
     ui_forge_pin_shared_memory.change(ui_refresh_memory_management_settings, inputs=mem_comps, queue=False, show_progress=False)
+
+    def on_attention_change(v):
+        from backend.attention_backend_info import apply_attention_backend
+
+        shared.opts.set("forge_attention_backend", v)
+        shared.opts.save(shared.config_filename)
+        apply_attention_backend(v, log=True)
+
+    ui_forge_attention.change(on_attention_change, inputs=[ui_forge_attention], queue=False, show_progress=False)
 
     ui_clip_skip = gr.Slider(label="Clip Skip", value=lambda: shared.opts.CLIP_stop_at_last_layers, minimum=1, maximum=12, step=1)
     bind_to_opts(ui_clip_skip, "CLIP_stop_at_last_layers", save=True)
@@ -208,7 +247,10 @@ def refresh_model_loading_parameters():
 
     unet_storage_dtype, lora_fp16 = forge_unet_storage_dtype_options.get(shared.opts.forge_unet_storage_dtype, (None, False))
 
+    # INT8 MixedPrecision only when dropdown is int8 / int8 (fp16 LoRA) → int8_tensorwise.
+    # Automatic keeps unet_storage_dtype=None (no INT8 auto-detect).
     dynamic_args["online_lora"] = lora_fp16
+    dynamic_args["forge_unet_storage_dtype"] = unet_storage_dtype
 
     model_data.forge_loading_parameters = dict(checkpoint_info=checkpoint_info, additional_modules=shared.opts.forge_additional_modules, unet_storage_dtype=unet_storage_dtype)
 
@@ -291,6 +333,7 @@ def forge_main_entry():
         ui_vae,
         ui_clip_skip,
         ui_forge_unet_storage_dtype_options,
+        ui_forge_attention,
         ui_forge_async_loading,
         ui_forge_pin_shared_memory,
         ui_forge_inference_memory,
@@ -353,7 +396,7 @@ def on_preset_change(preset: str):
     if model_mem < 0 or model_mem > total_vram:
         model_mem = total_vram - 1024
 
-    show_clip_skip = preset not in ("qwen", "lumina", "anima")
+    show_clip_skip = preset not in ("qwen", "lumina", "anima", "krea2")
     show_basic_mem = preset != "sd"
     show_adv_mem = preset in ("flux", "qwen")
     distilled = preset in ("flux", "lumina", "anima")
@@ -367,6 +410,7 @@ def on_preset_change(preset: str):
         gr.update(value=additional_modules),  # ui_vae
         gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
+        gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_attention_backend", "Default")),  # ui_forge_attention
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_async_loading", "Queue")),  # ui_forge_async_loading
         gr.update(visible=show_adv_mem, value=getattr(shared.opts, "forge_pin_shared_memory", "CPU")),  # ui_forge_pin_shared_memory
         gr.update(visible=show_basic_mem, value=model_mem),  # ui_forge_inference_memory

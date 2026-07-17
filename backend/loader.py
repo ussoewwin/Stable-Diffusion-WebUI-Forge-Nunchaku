@@ -13,6 +13,7 @@ from backend.comfy_te_glue import comfy_te_model_options, is_comfy_sd_clip
 from backend.diffusion_engine.chroma import Chroma
 from backend.diffusion_engine.flux import Flux
 from backend.diffusion_engine.anima import Anima
+from backend.diffusion_engine.krea2 import Krea2
 from backend.diffusion_engine.lumina import Lumina2
 from backend.diffusion_engine.qwen import QwenImage
 from backend.diffusion_engine.sd15 import StableDiffusion
@@ -31,7 +32,7 @@ from backend.utils import (
 )
 from modules_forge.packages.huggingface_guess import model_list
 
-possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, QwenImage, Anima, Lumina2, ZImage]
+possible_models = [StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Chroma, Flux, QwenImage, Anima, Lumina2, ZImage, Krea2]
 
 
 logging.getLogger("diffusers").setLevel(logging.ERROR)
@@ -43,6 +44,102 @@ _ANIMA_GUESS_NAMES = frozenset({"Anima", "AnimaBase", "AnimaWai68"})
 def _is_anima_guess(guess) -> bool:
     """Anima guess comes from ``modules_forge`` model_list; do not use cross-module isinstance."""
     return type(guess).__name__ in _ANIMA_GUESS_NAMES
+
+
+def _is_krea2_guess(guess) -> bool:
+    """Krea2 guess comes from ``modules_forge`` model_list; do not use cross-module isinstance."""
+    return type(guess).__name__ == "Krea2"
+
+
+def _state_dict_has_comfy_quant(state_dict) -> bool:
+    return any(isinstance(k, str) and k.endswith(".comfy_quant") for k in state_dict)
+
+
+def _load_krea2_mixed_precision_unet(
+    model_loader,
+    unet_config,
+    state_dict,
+    state_dict_parameters,
+    guess,
+):
+    """Krea2-only MixedPrecision path for Comfy ``comfy_quant`` / ``weight_scale`` checkpoints.
+
+    Early return used only when:
+      - ``cls_name == "SingleStreamDiT"``
+      - ``_is_krea2_guess(guess)``
+      - state_dict contains ``*.comfy_quant``
+
+    Must not alter Flux / Anima / Qwen / ZImage / INT8 / shared float8 construct.
+    Forge Neo equivalent: detect comfy_quant → mixed_precision_ops + bf16 storage
+    (UI float8_e4m3fn must not cast-destroy QuantizedTensor → noise).
+    """
+    import comfy.ops
+    import comfy.model_management as cmm
+
+    load_device = memory_management.get_torch_device()
+    computation_dtype = memory_management.get_computation_dtype(
+        load_device,
+        parameters=state_dict_parameters,
+        supported_dtypes=guess.supported_inference_dtypes,
+    )
+    # Neo: quant_config present → storage stays bf16 (ignore float8 UI overwrite).
+    storage_dtype = torch.bfloat16
+    offload_device = memory_management.unet_offload_device()
+    initial_device = memory_management.unet_initial_load_device(
+        parameters=state_dict_parameters, dtype=computation_dtype
+    )
+
+    disabled = set()
+    if not cmm.supports_nvfp4_compute(load_device):
+        disabled.add("nvfp4")
+    if not cmm.supports_mxfp8_compute(load_device):
+        disabled.add("mxfp8")
+    if not cmm.supports_fp8_compute(load_device):
+        disabled.add("float8_e4m3fn")
+        disabled.add("float8_e5m2")
+
+    mixed_ops = comfy.ops.mixed_precision_ops(
+        {}, compute_dtype=computation_dtype, disabled=disabled
+    )
+    unet_config = dict(unet_config)
+    unet_config["operations"] = mixed_ops
+
+    print(
+        f"[Krea2 MixedPrecision] comfy_quant detected — "
+        f"storage={storage_dtype} compute={computation_dtype} "
+        f"(UI float8 overwrite ignored; other models untouched)"
+    )
+    try:
+        from backend.attention_backend_info import log_comfy_attention_backend
+
+        log_comfy_attention_backend(tag="[Krea2]", when="mixed_precision_load")
+    except Exception as e:
+        print(f"[Krea2][Attention] visibility log failed: {e}")
+
+    # operations=False: do not monkeypatch torch.nn. SingleStreamDiT uses
+    # unet_config["operations"] for Linear / QuantizedTensor load.
+    with using_forge_operations(
+        operations=False,
+        device=initial_device,
+        dtype=computation_dtype,
+        manual_cast_enabled=False,
+    ):
+        model = model_loader(unet_config)
+
+    model = model.to(device=initial_device)
+    load_state_dict(model, state_dict)
+
+    if hasattr(model, "_internal_dict"):
+        model._internal_dict = unet_config
+    else:
+        model.config = unet_config
+
+    model.storage_dtype = storage_dtype
+    model.computation_dtype = computation_dtype
+    model.load_device = load_device
+    model.initial_device = initial_device
+    model.offload_device = offload_device
+    return model
 
 
 def _matches_guess_config(estimated_config, matched_guesses) -> bool:
@@ -80,7 +177,7 @@ def _te_filter_prefixes(guess, clip_key: str) -> list[str]:
     return out
 
 
-def _comfy_load_te(guess, state_dict, clip_key: str, layer_probe: str, spiece_from_guess: bool = False):
+def _comfy_load_te(guess, state_dict, clip_key: str, layer_probe: str, spiece_from_guess: bool = False, clip_type=None):
     from comfy.sd import load_text_encoder_state_dicts
 
     if not isinstance(state_dict, dict) or len(state_dict) <= 16:
@@ -100,6 +197,8 @@ def _comfy_load_te(guess, state_dict, clip_key: str, layer_probe: str, spiece_fr
         if spiece is not None:
             te_sd["spiece_model"] = spiece
 
+    if clip_type is not None:
+        return load_text_encoder_state_dicts([te_sd], clip_type=clip_type, model_options=comfy_te_model_options())
     return load_text_encoder_state_dicts([te_sd], model_options=comfy_te_model_options())
 
 
@@ -234,6 +333,20 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 clip_key="qwen3_4b.transformer",
                 layer_probe="model.layers.0.post_attention_layernorm.weight",
             )
+        if cls_name == "Qwen3VLModel" and _is_krea2_guess(guess):
+            if not isinstance(state_dict, dict) or len(state_dict) <= 16:
+                print(f"[Loader] Qwen3VLModel (krea2) skipped: state_dict has {len(state_dict) if isinstance(state_dict, dict) else 0} keys.")
+                return None
+
+            from comfy.sd import CLIPType
+
+            return _comfy_load_te(
+                guess,
+                state_dict,
+                clip_key="qwen3vl_4b.transformer",
+                layer_probe="model.visual.deepstack_merger_list.0.norm.weight",
+                clip_type=CLIPType.KREA2,
+            )
         if cls_name in ["T5EncoderModel", "UMT5EncoderModel"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have T5 state dict!"
 
@@ -284,6 +397,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             "Lumina2Transformer2DModel",
             "ZImageTransformer2DModel",
             "CosmosTransformer3DModel",
+            "SingleStreamDiT",
         ]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have model state dict!"
 
@@ -358,6 +472,23 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     guess.unet_config.pop(_k, None)
                 guess.unet_config["operations"] = comfy.ops.manual_cast
                 model_loader = lambda c: Anima(**c)
+            elif cls_name == "SingleStreamDiT" and _is_krea2_guess(guess):
+                # Krea2 (K2): Comfy SingleStreamDiT. Checkpoint keys are Comfy-native
+                # (model.diffusion_model.*) so no remap is needed. Config comes verbatim
+                # from comfy.model_detection.detect_unet_config (image_model + features/
+                # channels/patch/layers/heads/kvheads/txtlayers/txtdim). SingleStreamDiT
+                # accepts image_model + **kwargs, so extra keys are tolerated.
+                from comfy.ldm.krea2.model import SingleStreamDiT
+                import comfy.ops
+
+                guess.unet_config["operations"] = comfy.ops.manual_cast
+                model_loader = lambda c: SingleStreamDiT(**c)
+                try:
+                    from backend.attention_backend_info import log_comfy_attention_backend
+
+                    log_comfy_attention_backend(tag="[Krea2]", when="unet_construct")
+                except Exception as e:
+                    print(f"[Krea2][Attention] visibility log failed: {e}")
 
             unet_config = guess.unet_config.copy()
             
@@ -395,6 +526,21 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                     _nz=_nz,
                     precision=precision if _nz else None,
                     rank=rank if _nz else None,
+                )
+
+            # Krea2 MixedPrecision (comfy_quant): early return — Krea2 + SingleStreamDiT only.
+            # Before float8 UI overwrite / shared construct (those drop scales → noise).
+            if (
+                cls_name == "SingleStreamDiT"
+                and _is_krea2_guess(guess)
+                and _state_dict_has_comfy_quant(state_dict)
+            ):
+                return _load_krea2_mixed_precision_unet(
+                    model_loader=model_loader,
+                    unet_config=unet_config,
+                    state_dict=state_dict,
+                    state_dict_parameters=state_dict_parameters,
+                    guess=guess,
                 )
 
             if unet_storage_dtype_overwrite is not None:
@@ -739,6 +885,11 @@ def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor]
                 sd[f"{text_encoder_key_prefix}spiece_model"] = v
                 continue
             sd[f"{text_encoder_key_prefix}gemma2_2b.{k}"] = v
+
+    elif "model.visual.deepstack_merger_list.0.norm.weight" in asd:  # Krea2 TE: Qwen3-VL-4B (DeepStack is unique to Qwen3-VL)
+        assert asd["model.visual.merger.linear_fc2.weight"].shape[0] == 2560  # 4B (8B == 3584)
+        for k, v in asd.items():
+            sd[f"{text_encoder_key_prefix}qwen3vl_4b.transformer.{k}"] = v
 
     elif "model.layers.0.self_attn.k_proj.bias" in asd:
         weight = asd["model.layers.0.self_attn.k_proj.bias"]

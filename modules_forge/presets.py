@@ -18,6 +18,7 @@ class PresetArch(Enum):
     qwen = 4
     lumina = 5
     anima = 6
+    krea2 = 7
 
 
 SAMPLERS = {
@@ -27,6 +28,7 @@ SAMPLERS = {
     PresetArch.qwen: "LCM",
     PresetArch.lumina: "Res Multistep",
     PresetArch.anima: "Euler",
+    PresetArch.krea2: "Euler",
 }
 
 SCHEDULERS = {
@@ -36,6 +38,7 @@ SCHEDULERS = {
     PresetArch.qwen: "Normal",
     PresetArch.lumina: "Linear Quadratic",
     PresetArch.anima: "Simple",
+    PresetArch.krea2: "Simple",
 }
 
 WIDTH = {
@@ -45,6 +48,7 @@ WIDTH = {
     PresetArch.qwen: 896,
     PresetArch.lumina: 1024,
     PresetArch.anima: 1024,
+    PresetArch.krea2: 1024,
 }
 
 HEIGHT = {
@@ -54,6 +58,7 @@ HEIGHT = {
     PresetArch.qwen: 1152,
     PresetArch.lumina: 1024,
     PresetArch.anima: 1024,
+    PresetArch.krea2: 1024,
 }
 
 CFG = {
@@ -63,6 +68,7 @@ CFG = {
     PresetArch.qwen: 1.0,
     PresetArch.lumina: 4.5,
     PresetArch.anima: 4.5,
+    PresetArch.krea2: 1.0,
 }
 
 

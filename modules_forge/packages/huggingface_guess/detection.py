@@ -53,6 +53,13 @@ def detect_unet_config(state_dict: dict, key_prefix: str):
 
         return comfy_model_detection.detect_unet_config(state_dict, key_prefix)
 
+    # Krea2 (SingleStreamDiT): full config from ComfyUI model_detection.
+    # Key-disjoint from Flux (double_blocks.*) — Krea2 uses txtfusion.*/blocks.*.
+    if "{}txtfusion.projector.weight".format(key_prefix) in state_dict_keys:  # Krea2
+        import comfy.model_detection as comfy_model_detection
+
+        return comfy_model_detection.detect_unet_config(state_dict, key_prefix)
+
     if (
         "{}cap_embedder.1.weight".format(key_prefix) in state_dict_keys
         and (
