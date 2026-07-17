@@ -59,7 +59,7 @@
     - `SA2` — SageAttention 2
     - `SA3` — SageAttention3 (Blackwell FP4), e.g. `3.0.0.b1` when installed
     - `FA2` — Flash-Attention 2 called directly
-  - Applies on Comfy-path models (e.g. **Krea2** UI Preset) without reloading the UNet
+  - Applies on Comfy-path models without reloading the UNet
   - Logs the resolved backend with the full installed version string (not a short token only)
 
   <p align="left">
@@ -72,7 +72,6 @@
   - ✅ **Native Forge support for Krea2** (SingleStreamDiT; e.g. `moodyKreaMix_V33.safetensors`)
   - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel
   - Load **Additional modules**: `qwen_image_vae.safetensors` (VAE), Qwen2-VL text encoder (e.g. `Qwen2_VL_2B_Thinking_obliterated.safetensors`)
-  - Works with the **Attention** quicksettings switch (`Default` / `SA2` / `SA3` / `FA2`) on the Comfy-path Krea2 UNet
   - LoRA key mapping via `krea2_to_diffusers`
 
   <p align="left">

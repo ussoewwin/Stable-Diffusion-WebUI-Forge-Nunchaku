@@ -59,7 +59,7 @@
     - `SA2` — SageAttention 2
     - `SA3` — SageAttention3（Blackwell FP4），已安装时例如 `3.0.0.b1`
     - `FA2` — 直接调用 Flash-Attention 2
-  - 适用于 Comfy 路径模型（例如 **Krea2** UI Preset），无需重新加载 UNet
+  - 适用于 Comfy 路径模型，无需重新加载 UNet
   - 日志输出已解析后端的完整版本字符串（不仅是缩写）
 
   <p align="left">
@@ -72,7 +72,6 @@
   - ✅ **Krea2 的 Native Forge 支持**（SingleStreamDiT；例如 `moodyKreaMix_V33.safetensors`）
   - Forge checkpoint 面板中的专用 **UI Preset: Krea2**
   - 加载 **Additional modules**：`qwen_image_vae.safetensors`（VAE）、Qwen2-VL 文本编码器（例如 `Qwen2_VL_2B_Thinking_obliterated.safetensors`）
-  - 可与 **Attention** quicksettings 切换配合使用（`Default` / `SA2` / `SA3` / `FA2`），作用于 Comfy 路径的 Krea2 UNet
   - 通过 `krea2_to_diffusers` 进行 LoRA 键映射
 
   <p align="left">
