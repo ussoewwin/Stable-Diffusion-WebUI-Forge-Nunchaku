@@ -417,9 +417,8 @@ def prepare_environment():
         startup_timer.record("install pyaudioop")
 
     if os.name == "nt":
-        insightface_package = os.environ.get("INSIGHTFACE_PACKAGE", "https://huggingface.co/ussoewwin/Insightface_for_windows/resolve/main/insightface-0.7.3-cp313-cp313-win_amd64.whl")
         if not is_installed("insightface"):
-            run_pip(f"install {insightface_package}", "insightface")
+            run_pip("install insightface", "insightface")
             startup_timer.record("install insightface")
 
     ver_PY = f"cp{sys.version_info.major}{sys.version_info.minor}"
@@ -441,14 +440,12 @@ def prepare_environment():
         )
         triton_package = os.environ.get("TRITION_PACKAGE", "triton-windows")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl")
-        onnxruntime_package = os.environ.get("ONNX_PACKAGE", "https://huggingface.co/ussoewwin/onnxruntime-gpu-1.24.0/resolve/main/onnxruntime_gpu-1.24.0-cp313-cp313-win_amd64.whl")
 
     else:
         sage_package = os.environ.get("SAGE_PACKAGE", f"sageattention=={ver_SAGE}")
         flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.5.4/flash_attn-{ver_FLASH}+{ver_CUDA}torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
         nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
-        onnxruntime_package = os.environ.get("ONNX_PACKAGE", "onnxruntime-gpu --pre --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/")
 
     def _verify_native_import(package: str) -> bool:
         """Verify a package can actually be imported (catches DLL / native extension failures)."""
@@ -574,7 +571,10 @@ def prepare_environment():
 
     if args.onnxruntime_gpu and not is_installed("onnxruntime-gpu"):
         try:
-            run_pip(f"install {onnxruntime_package}", "onnxruntime-gpu")
+            run_pip(
+                "install --pre --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ort-cuda-13-nightly/pypi/simple/ onnxruntime-gpu",
+                "onnxruntime-gpu",
+            )
         except RuntimeError:
             print("Failed to install onnxruntime-gpu; Please manually install it")
         else:
