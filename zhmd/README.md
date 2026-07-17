@@ -23,6 +23,22 @@
 
 ### 🎯 主要功能
 
+- **共通 Attention 后端切换（Quicksettings）**
+  - ✅ **共通的运行时 Attention 后端**，位于 Forge quicksettings 栏中 `Diffusion in Low Bits` 旁
+  - 下拉选项：`Default` / `SA2` / `SA3` / `FA2`
+    - `Default` — pytorch SDPA
+    - `SA2` — SageAttention 2
+    - `SA3` — SageAttention3（Blackwell FP4），已安装时例如 `3.0.0.b1`
+    - `FA2` — 直接调用 Flash-Attention 2
+  - 共通 Attention 路径（运行时切换；无需重新加载 UNet）
+  - 日志输出已解析后端的完整版本字符串（不仅是缩写）
+
+  <p align="left">
+    <img src="../png/attention.png" alt="Attention quicksettings dropdown: Default / SA2 / SA3 / FA2" width="400">
+  </p>
+
+  *Quicksettings 中的 `Attention` 下拉菜单（位于 Diffusion in Low Bits 旁）— 共通 UI*
+
 - **Nunchaku Qwen Image 和 Z-Image 的 LoRA 支持**
   - ✅ **对 Nunchaku Qwen Image (QI) 模型的完整 LoRA 支持**
   - ✅ **对 Nunchaku Z-Image (ZIT) 模型的完整 LoRA 支持**
@@ -51,22 +67,6 @@
   </p>
 
   *`Diffusion in Low Bits` 下拉菜单：`int8` / `int8 (fp16 LoRA)` 选择*
-
-- **Attention 后端切换（Quicksettings）**
-  - ✅ **运行时 Attention 后端选择**，位于 Forge quicksettings 栏中 `Diffusion in Low Bits` 旁
-  - 下拉选项：`Default` / `SA2` / `SA3` / `FA2`
-    - `Default` — pytorch SDPA
-    - `SA2` — SageAttention 2
-    - `SA3` — SageAttention3（Blackwell FP4），已安装时例如 `3.0.0.b1`
-    - `FA2` — 直接调用 Flash-Attention 2
-  - Forge 共用 Attention 路径（运行时切换；无需重新加载 UNet）
-  - 日志输出已解析后端的完整版本字符串（不仅是缩写）
-
-  <p align="left">
-    <img src="../png/attention.png" alt="Attention quicksettings dropdown: Default / SA2 / SA3 / FA2" width="400">
-  </p>
-
-  *Quicksettings 中的 `Attention` 下拉菜单（位于 Diffusion in Low Bits 旁）*
 
 - **Krea2 模型支持**
   - ✅ **Krea2 的 Native Forge 支持**（SingleStreamDiT；例如 `moodyKreaMix_V33.safetensors`）
