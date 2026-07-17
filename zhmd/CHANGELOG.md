@@ -7,6 +7,13 @@
   </tr>
 </table>
 
+## Version 1.8.1
+
+- **清理：移除 Nunchaku SDXL 代码（第一阶段）**
+  - 删除 Nunchaku SDXL 专用文件（**`nunchaku_sdxl_unet.py`**、**`nunchaku_sdxl_clip.py`**、**`nunchaku_sdxl_unet_append.py`**），并从 **`backend/loader.py`**、**`extensions-builtin/sd_forge_lora/networks.py`** 以及四个 RES4LYF beta 采样器中移除 SDXL 专用分支。
+  - 不影响常规 SDXL、fp16 / fp8 / int8，以及其他模型的 Nunchaku。
+  - 详情请参阅 [Release Notes（中文）](v1.8.1.md)。
+
 ## Version 1.8.0
 
 - **面向 SDXL 与 Z-Image 的 INT8（Low Bits）UNet 量化**

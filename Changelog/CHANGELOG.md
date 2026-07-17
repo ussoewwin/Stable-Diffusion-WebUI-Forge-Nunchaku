@@ -7,6 +7,13 @@
   </tr>
 </table>
 
+## Version 1.8.1
+
+- **Cleanup: Nunchaku SDXL code removal (phase 1)**
+  - Removed dedicated Nunchaku SDXL files (**`nunchaku_sdxl_unet.py`**, **`nunchaku_sdxl_clip.py`**, **`nunchaku_sdxl_unet_append.py`**) and SDXL-specific branches from **`backend/loader.py`**, **`extensions-builtin/sd_forge_lora/networks.py`**, and the four RES4LYF beta samplers.
+  - No impact on normal SDXL, fp16 / fp8 / int8, or Nunchaku for other models.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.1) for details.
+
 ## Version 1.8.0
 
 - **INT8 (Low Bits) UNet quantization for SDXL and Z-Image**
