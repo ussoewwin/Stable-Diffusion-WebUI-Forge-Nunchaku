@@ -31,6 +31,7 @@
     - `SA3` — SageAttention3（Blackwell FP4），已安装时例如 `3.0.0.b1`
     - `FA2` — 直接调用 Flash-Attention 2
   - 共通 Attention 路径（运行时切换；无需重新加载 UNet）
+  - 使用 **Nunchaku** 时，请将 Attention 保持为 **`Default`**
   - 日志输出已解析后端的完整版本字符串（不仅是缩写）
 
   <p align="left">

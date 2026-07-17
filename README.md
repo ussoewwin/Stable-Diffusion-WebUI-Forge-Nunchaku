@@ -31,6 +31,7 @@
     - `SA3` — SageAttention3 (Blackwell FP4), e.g. `3.0.0.b1` when installed
     - `FA2` — Flash-Attention 2 called directly
   - Common Attention path (runtime switch; no UNet reload)
+  - When using **Nunchaku**, keep Attention on **`Default`**
   - Logs the resolved backend with the full installed version string (not a short token only)
 
   <p align="left">
