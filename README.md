@@ -34,10 +34,23 @@
 
 - **INT8 (Low Bits) UNet Quantization**
   - ✅ **INT8 UNet support for SDXL and Z-Image**
-  - Selected explicitly via the **UI "Low Bits" dropdown** (`int8` / `int8 (fp16 LoRA)`), never auto-detected
+  - Selected explicitly from the **`Diffusion in Low Bits` dropdown** in the Forge settings panel, never auto-detected. The full menu is:
+    - `Automatic` — no forced storage dtype (default; **not** INT8)
+    - `Automatic (fp16 LoRA)` — same as `Automatic`, LoRA kept in FP16
+    - `float8-e4m3fn` / `float8-e4m3fn (fp16 LoRA)` — FP8 storage paths
+    - **`int8`** — INT8 UNet, LoRA baked into the INT8 weights
+    - **`int8 (fp16 LoRA)`** — INT8 UNet, LoRA kept in FP16 for online (bake-free) application
+    - `bnb-nf4` / `bnb-fp4` (and their `(fp16 LoRA)` variants) — only shown when bitsandbytes is available
+  - Only the two **`int8`** / **`int8 (fp16 LoRA)`** entries enable INT8; every other entry uses a different loading path
   - Tensor-wise INT8 storage (`int8_tensorwise`) for reduced VRAM usage
   - `int8 (fp16 LoRA)` keeps LoRA in FP16 for online (bake-free) application
   - Fully separated from the float8 / bnb / Automatic loading paths
+
+  <p align="left">
+    <img src="png/int8.png" alt="Diffusion in Low Bits dropdown with int8 options" width="400">
+  </p>
+
+  *`Diffusion in Low Bits` dropdown: `int8` / `int8 (fp16 LoRA)` selection*
 
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
