@@ -7,6 +7,13 @@
   </tr>
 </table>
 
+## Version 1.8.3
+
+- **Anima：Q/K RMSNorm + split-half RoPE 融合**
+  - Anima SelfAttn 且带 RoPE 时，通过 **`comfy_kitchen.rms_rope_split_half`** 融合 Q/K RMSNorm 与 split-half RoPE（需 **`comfy-kitchen>=0.2.21`**）；CrossAttn / 无 RoPE 路径保持原样。
+  - 在 Anima 加载路径挂接（`install_anima_rms_rope_fuse` → `comfy.ldm.cosmos.predict2.Attention.compute_qkv`）。
+  - 详情请参阅 [Release Notes（中文）](v1.8.3.md)。
+
 ## Version 1.8.2
 
 - **Krea2 模型支持**
