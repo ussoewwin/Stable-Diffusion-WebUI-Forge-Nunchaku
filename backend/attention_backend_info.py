@@ -1,7 +1,9 @@
 # Flash-Attention / SageAttention visibility + shared Attention UI runtime switch.
 # Detection helpers mirror ComfyUI-DistorchMemoryManager nodes/sa.py.
 # FA2 UI path follows A1111 md/FA2_direct_load_design.md:
-#   flash_attn_func directly (no xformers) → SDPA fallback → once-per-switch log.
+#   flash_attn_func directly (no xformers) → SDPA fallback.
+# FA-2 / SA2 / SA3 ``[Forge] … called`` lines: once per Generate job
+# (reset_attention_forward_log clears all three flags every process_images_inner).
 
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ def attention_sa2_with_forge_log(
     skip_output_reshape=False,
     **kwargs,
 ):
-    """SA2 path with the same first-call ``[Forge] … called`` line as FA-2."""
+    """SA2 path: ``[Forge] SA2 … called`` once per Generate (same as FA-2 / SA3)."""
     global _sa2_call_log_shown
     import comfy.ldm.modules.attention as comfy_attention
 
@@ -66,7 +68,7 @@ def attention_sa3_with_forge_log(
     skip_output_reshape=False,
     **kwargs,
 ):
-    """SA3 path with the same first-call ``[Forge] … called`` line as FA-2."""
+    """SA3 path: ``[Forge] SA3 … called`` once per Generate (same as FA-2 / SA2)."""
     global _sa3_call_log_shown
     import comfy.ldm.modules.attention as comfy_attention
 
@@ -351,10 +353,21 @@ def clear_attention_log_once_flags():
 
 
 def reset_attention_forward_log():
-    """Allow per-Generate Attention backend= lines to print again on the next job."""
+    """Reset all per-Generate ``[Forge] … called`` gates — FA-2, SA2, and SA3.
+
+    Called at the start of every ``process_images_inner`` so each Generate prints
+    again. Without clearing ``_sa2_call_log_shown`` / ``_sa3_call_log_shown`` /
+    ``_fa2_direct_log_shown``, the second Generate silently drops the line.
+    Still once per job (not once per Attention layer).
+    """
+    global _fa2_direct_log_shown, _sa2_call_log_shown, _sa3_call_log_shown
     drop = [k for k in list(_logged_tags) if k.endswith("|first_forward")]
     for k in drop:
         _logged_tags.discard(k)
+    # FA-2 / SA2 / SA3 — all three, every Generate. Do not leave any True.
+    _fa2_direct_log_shown = False
+    _sa2_call_log_shown = False
+    _sa3_call_log_shown = False
     try:
         import comfy.ldm.krea2.model as krea2_model
 
