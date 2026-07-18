@@ -10,7 +10,7 @@ from backend.text_processing.krea2_engine import Krea2TextProcessingEngine
 
 
 class Krea2(ForgeDiffusionEngine):
-    """Forge glue only: Comfy ``SingleStreamDiT`` UNet + Comfy ``sd.CLIP`` (Krea2 Qwen3-VL-4B TE) + Wan VAE.
+    """Forge glue only: Comfy ``SingleStreamDiT`` UNet + Comfy ``sd.CLIP`` (Krea2 Qwen3-VL-4B TE) + Qwen-Image VAE.
 
     Comfy Krea2 is ``ModelType.FLUX``; its sigma schedule is ``flux_time_shift(shift=1.15, 1.0, t)``.
     Forge-Nunchaku ``PredictionFlux`` takes that shift through its ``mu`` kwarg verbatim

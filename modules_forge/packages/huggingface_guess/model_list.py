@@ -543,7 +543,7 @@ class Anima(AnimaBase):
 
 
 class Krea2(BASE):
-    """Krea 2 (K2): Comfy ``SingleStreamDiT`` UNet + Qwen3-VL-4B TE + Wan VAE.
+    """Krea 2 (K2): Comfy ``SingleStreamDiT`` UNet + Qwen3-VL-4B TE + Qwen-Image VAE.
 
     Mirrors ``comfy.supported_models.Krea2``. ``model_type`` is ``FLUX`` (like Flux1) so
     the Comfy-side ``model_sampling`` is ``ModelSamplingFlux(shift=1.15)``. Detection is

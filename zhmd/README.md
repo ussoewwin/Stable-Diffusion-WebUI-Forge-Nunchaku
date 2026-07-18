@@ -70,7 +70,7 @@
 - **Krea2 模型支持**
   - ✅ **Krea2 的 Native Forge 支持**（SingleStreamDiT；例如 `moodyKreaMix_V33.safetensors`）
   - Forge checkpoint 面板中的专用 **UI Preset: Krea2**
-  - 加载 **Additional modules**：`qwen_image_vae.safetensors`（VAE）、Qwen2-VL 文本编码器（例如 `Qwen2_VL_2B_Thinking_obliterated.safetensors`）
+  - 加载 **Additional modules**：`qwen_image_vae.safetensors`（Qwen-Image VAE）、Qwen3-VL-4B 文本编码器（例如 `qwen3vl_4b_bf16.safetensors`）
   - 通过 `krea2_to_diffusers` 进行 LoRA 键映射
 
   <p align="left">
@@ -82,7 +82,7 @@
 - **Anima 模型支持**
   - ✅ **Anima 的 Native Forge 支持**（例如 `waiANIMA_pw3.safetensors`）
   - Forge checkpoint 面板中的专用 **UI Preset: Anima**
-  - 加载 **Additional modules**：`qwen_3_06b_base.safetensors`（Qwen3 文本编码器）、`qwen_image_vae.safetensors`（VAE）
+  - 加载 **Additional modules**：`qwen_3_06b_base.safetensors`（Qwen3 文本编码器）、`qwen_image_vae.safetensors`（Qwen-Image VAE）
   - 用于 `llm_adapter` cross-attention 的 T5 tokenizer 词汇表（无需单独的 T5/UMT5 权重文件）
 
   <p align="left">

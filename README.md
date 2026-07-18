@@ -70,7 +70,7 @@
 - **Krea2 Model Support**
   - ✅ **Native Forge support for Krea2** (SingleStreamDiT; e.g. `moodyKreaMix_V33.safetensors`)
   - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel
-  - Load **Additional modules**: `qwen_image_vae.safetensors` (VAE), Qwen2-VL text encoder (e.g. `Qwen2_VL_2B_Thinking_obliterated.safetensors`)
+  - Load **Additional modules**: `qwen_image_vae.safetensors` (Qwen-Image VAE), Qwen3-VL-4B text encoder (e.g. `qwen3vl_4b_bf16.safetensors`)
   - LoRA key mapping via `krea2_to_diffusers`
 
   <p align="left">
@@ -82,7 +82,7 @@
 - **Anima Model Support**
   - ✅ **Native Forge support for Anima** (e.g. `waiANIMA_pw3.safetensors`)
   - Dedicated **UI Preset: Anima** in the Forge checkpoint panel
-  - Load **Additional modules**: `qwen_3_06b_base.safetensors` (Qwen3 text encoder), `qwen_image_vae.safetensors` (VAE)
+  - Load **Additional modules**: `qwen_3_06b_base.safetensors` (Qwen3 text encoder), `qwen_image_vae.safetensors` (Qwen-Image VAE)
   - T5 tokenizer vocabulary for `llm_adapter` cross-attention (no separate T5/UMT5 weight file required)
 
   <p align="left">

@@ -10,8 +10,8 @@
 ## Version 1.8.2
 
 - **Krea2 Model Support**
-  - Native Forge support for **Krea2** (`SingleStreamDiT` UNet, Qwen3-VL-4B text encoder, Wan VAE); e.g. `moodyKreaMix_V33.safetensors`.
-  - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel; LoRA key mapping via **`krea2_to_diffusers`**; MixedPrecision **`comfy_quant`** load path for quantized Krea2 checkpoints.
+  - Native Forge support for **Krea2** (`SingleStreamDiT` UNet, Qwen3-VL-4B text encoder, Qwen-Image VAE); e.g. `moodyKreaMix_V33.safetensors`.
+  - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel; load **Additional modules** `qwen_image_vae.safetensors` (Qwen-Image VAE) and Qwen3-VL-4B TE (e.g. `qwen3vl_4b_bf16.safetensors`); LoRA key mapping via **`krea2_to_diffusers`**; MixedPrecision **`comfy_quant`** load path for quantized Krea2 checkpoints.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.2) for details.
 
 ## Version 1.8.1
@@ -50,7 +50,7 @@
 ## Version 1.7.7
 
 - **Anima + ADetailer: img2img inpaint flag fix**
-  - **`Anima`** engine sets **`is_inpaint = False`** after load so WebUI SD-style latent mask/image concat is not used on Wan **5D** latents.
+  - **`Anima`** engine sets **`is_inpaint = False`** after load so WebUI SD-style latent mask/image concat is not used on Qwen-Image VAE **5D** latents.
   - Fixes **`RuntimeError: Tensors must have same number of dimensions: got 4 and 5`** when ADetailer post-processes **`AnimaWai68`** checkpoints (e.g. **`waiANIMA_pw3.safetensors`**) after main txt2img; regional masks still apply via existing **5D** mask blend in img2img **`sample()`**.
   - Change is scoped to **`backend/diffusion_engine/anima.py`** only (same pattern as Qwen / Flux / Lumina); other models unchanged. Commit **`9c85472`**.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.7) for details.
@@ -105,7 +105,7 @@
 
 - **Anima model support**
   - Native Forge support for [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) and compatible single-file checkpoints (e.g. `anima-base-v1.0.safetensors`, community merges such as `waiANIMA_pw3.safetensors`).
-  - New **UI Preset: Anima** in the checkpoint manager; load **Additional modules** `qwen_3_06b_base.safetensors` (Qwen3 text encoder) and `qwen_image_vae.safetensors` (VAE). T5 tokenizer vocabulary is used for `llm_adapter` cross-attention without a separate T5/UMT5 weight file.
+  - New **UI Preset: Anima** in the checkpoint manager; load **Additional modules** `qwen_3_06b_base.safetensors` (Qwen3 text encoder) and `qwen_image_vae.safetensors` (Qwen-Image VAE). T5 tokenizer vocabulary is used for `llm_adapter` cross-attention without a separate T5/UMT5 weight file.
   - Native `backend.nn.anima` UNet with flow-matching sampling; **Shift** in the UI applies to the noise schedule.
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.0) for details.
 

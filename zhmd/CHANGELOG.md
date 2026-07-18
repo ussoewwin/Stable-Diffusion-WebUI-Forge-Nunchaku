@@ -10,8 +10,8 @@
 ## Version 1.8.2
 
 - **Krea2 模型支持**
-  - 为 **Krea2** 提供原生 Forge 支持（`SingleStreamDiT` UNet、Qwen3-VL-4B 文本编码器、Wan VAE）；例如 `moodyKreaMix_V33.safetensors`。
-  - Forge checkpoint 面板中的专用 **UI Preset: Krea2**；通过 **`krea2_to_diffusers`** 进行 LoRA 键映射；量化 Krea2 checkpoint 的 MixedPrecision **`comfy_quant`** 加载路径。
+  - 为 **Krea2** 提供原生 Forge 支持（`SingleStreamDiT` UNet、Qwen3-VL-4B 文本编码器、Qwen-Image VAE）；例如 `moodyKreaMix_V33.safetensors`。
+  - Forge checkpoint 面板中的专用 **UI Preset: Krea2**；加载 **Additional modules** `qwen_image_vae.safetensors`（Qwen-Image VAE）与 Qwen3-VL-4B TE（例如 `qwen3vl_4b_bf16.safetensors`）；通过 **`krea2_to_diffusers`** 进行 LoRA 键映射；量化 Krea2 checkpoint 的 MixedPrecision **`comfy_quant`** 加载路径。
   - 详情请参阅 [Release Notes（中文）](v1.8.2.md)。
 
 ## Version 1.8.1
@@ -50,7 +50,7 @@
 ## Version 1.7.7
 
 - **Anima + ADetailer：img2img inpaint 标志修复**
-  - **`Anima`** 引擎加载后将 **`is_inpaint = False`**，避免在 Wan **5D** latent 上走 WebUI SD 风格的 latent mask/图像 concat。
+  - **`Anima`** 引擎加载后将 **`is_inpaint = False`**，避免在 Qwen-Image VAE **5D** latent 上走 WebUI SD 风格的 latent mask/图像 concat。
   - 修复主 txt2img 成功后 ADetailer 后处理 **`AnimaWai68`** checkpoint（如 **`waiANIMA_pw3.safetensors`**）时出现的 **`RuntimeError: Tensors must have same number of dimensions: got 4 and 5`**；区域 mask 仍通过 img2img **`sample()`** 中已有的 **5D** mask blend 生效。
   - 变更仅限 **`backend/diffusion_engine/anima.py`**（与 Qwen / Flux / Lumina 相同做法），其他模型不受影响。提交 **`9c85472`**。
   - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.7.7)。
@@ -106,7 +106,7 @@
 
 - **Anima 模型支持**
   - 对 [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) 及兼容单文件 checkpoint（例如 `anima-base-v1.0.safetensors`、社区合并模型如 `waiANIMA_pw3.safetensors`）的 Native Forge 支持。
-  - checkpoint 管理器中新增 **UI Preset: Anima**；加载 **Additional modules** `qwen_3_06b_base.safetensors`（Qwen3 文本编码器）和 `qwen_image_vae.safetensors`（VAE）。T5 tokenizer 词汇表用于 `llm_adapter` cross-attention，无需单独的 T5/UMT5 权重文件。
+  - checkpoint 管理器中新增 **UI Preset: Anima**；加载 **Additional modules** `qwen_3_06b_base.safetensors`（Qwen3 文本编码器）和 `qwen_image_vae.safetensors`（Qwen-Image VAE）。T5 tokenizer 词汇表用于 `llm_adapter` cross-attention，无需单独的 T5/UMT5 权重文件。
   - Native `backend.nn.anima` UNet 与 flow-matching 采样；UI 中的 **Shift** 应用于噪声 schedule。
   - 详情请参阅 [Release Notes（中文）](v1.7.0.md)。
 
