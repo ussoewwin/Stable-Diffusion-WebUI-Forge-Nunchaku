@@ -7,12 +7,14 @@
   </tr>
 </table>
 
-## Version 1.8.1
+## Version 1.8.2
 
 - **Krea2 模型支持**
   - 为 **Krea2** 提供原生 Forge 支持（`SingleStreamDiT` UNet、Qwen3-VL-4B 文本编码器、Wan VAE）；例如 `moodyKreaMix_V33.safetensors`。
   - Forge checkpoint 面板中的专用 **UI Preset: Krea2**；通过 **`krea2_to_diffusers`** 进行 LoRA 键映射；量化 Krea2 checkpoint 的 MixedPrecision **`comfy_quant`** 加载路径。
-  - 详情请参阅 [Release Notes（中文）](v1.8.1.md)。
+  - 详情请参阅 [Release Notes（中文）](v1.8.2.md)。
+
+## Version 1.8.1
 
 - **清理：移除 Nunchaku SDXL 代码（第一阶段）**
   - 删除 Nunchaku SDXL 专用文件（**`nunchaku_sdxl_unet.py`**、**`nunchaku_sdxl_clip.py`**、**`nunchaku_sdxl_unet_append.py`**），并从 **`backend/loader.py`**、**`extensions-builtin/sd_forge_lora/networks.py`** 以及四个 RES4LYF beta 采样器中移除 SDXL 专用分支。
