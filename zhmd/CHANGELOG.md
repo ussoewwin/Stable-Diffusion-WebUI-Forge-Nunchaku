@@ -7,15 +7,19 @@
   </tr>
 </table>
 
+## Version 1.8.4
+
+- **Krea2：`layout_cls` 为 None 时的量化 TE 加载回退**
+  - Forge 侧运行时补丁：当 `get_layout_class(...)` 返回 `None` 时，将 MixedPrecision 权重 dequant 为 float Parameter，修复量化 Krea2 文本编码器加载时的 `AttributeError: 'NoneType' object has no attribute 'Params'`。
+  - Issue：https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/issues/3
+  - 依赖：`safetensors>=0.8.0`（与 `diffusers>=0.39.0` 兼容）。
+  - 详情请参阅 [Release Notes（中文）](v1.8.4.md)。
+
 ## Version 1.8.3
 
 - **Anima：Q/K RMSNorm + split-half RoPE 融合**
   - Anima SelfAttn 且带 RoPE 时，通过 **`comfy_kitchen.rms_rope_split_half`** 融合 Q/K RMSNorm 与 split-half RoPE（需 **`comfy-kitchen>=0.2.21`**）；CrossAttn / 无 RoPE 路径保持原样。
   - 在 Anima 加载路径挂接（`install_anima_rms_rope_fuse` → `comfy.ldm.cosmos.predict2.Attention.compute_qkv`）。
-  - 详情请参阅 [Release Notes（中文）](v1.8.3.md)。
-- **Krea2：`layout_cls` 为 None 时的量化 TE 加载回退**
-  - Forge 侧运行时补丁：当 `get_layout_class(...)` 返回 `None` 时，将 MixedPrecision 权重 dequant 为 float Parameter，修复量化 Krea2 文本编码器加载时的 `AttributeError: 'NoneType' object has no attribute 'Params'`。
-  - Issue：https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/issues/3
   - 详情请参阅 [Release Notes（中文）](v1.8.3.md)。
 
 ## Version 1.8.2

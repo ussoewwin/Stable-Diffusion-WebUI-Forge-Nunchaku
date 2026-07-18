@@ -7,15 +7,19 @@
   </tr>
 </table>
 
+## Version 1.8.4
+
+- **Krea2: quantized TE load fallback when `layout_cls` is None**
+  - Forge-side runtime patch dequantizes MixedPrecision weights to float Parameters when `get_layout_class(...)` returns `None`, fixing `AttributeError: 'NoneType' object has no attribute 'Params'` on quantized Krea2 text-encoder load.
+  - Issue: https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/issues/3
+  - Dependency: `safetensors>=0.8.0` (compatible with `diffusers>=0.39.0`).
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.4) for details.
+
 ## Version 1.8.3
 
 - **Anima: Q/K RMSNorm + split-half RoPE fuse**
   - On Anima SelfAttn with RoPE, fuse Q/K RMSNorm and split-half RoPE via **`comfy_kitchen.rms_rope_split_half`** (requires **`comfy-kitchen>=0.2.21`**); CrossAttn and no-rope paths stay stock.
   - Wired from the Anima loader path (`install_anima_rms_rope_fuse` on `comfy.ldm.cosmos.predict2.Attention.compute_qkv`).
-  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.3) for details.
-- **Krea2: quantized TE load fallback when `layout_cls` is None**
-  - Forge-side runtime patch dequantizes MixedPrecision weights to float Parameters when `get_layout_class(...)` returns `None`, fixing `AttributeError: 'NoneType' object has no attribute 'Params'` on quantized Krea2 text-encoder load.
-  - Issue: https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/issues/3
   - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.3) for details.
 
 ## Version 1.8.2
