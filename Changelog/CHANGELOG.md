@@ -9,6 +9,11 @@
 
 ## Version 1.8.1
 
+- **Krea2 Model Support**
+  - Native Forge support for **Krea2** (`SingleStreamDiT` UNet, Qwen3-VL-4B text encoder, Wan VAE); e.g. `moodyKreaMix_V33.safetensors`.
+  - Dedicated **UI Preset: Krea2** in the Forge checkpoint panel; LoRA key mapping via **`krea2_to_diffusers`**; MixedPrecision **`comfy_quant`** load path for quantized Krea2 checkpoints.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.1) for details.
+
 - **Cleanup: Nunchaku SDXL code removal (phase 1)**
   - Removed dedicated Nunchaku SDXL files (**`nunchaku_sdxl_unet.py`**, **`nunchaku_sdxl_clip.py`**, **`nunchaku_sdxl_unet_append.py`**) and SDXL-specific branches from **`backend/loader.py`**, **`extensions-builtin/sd_forge_lora/networks.py`**, and the four RES4LYF beta samplers.
   - No impact on normal SDXL, fp16 / fp8 / int8, or Nunchaku for other models.
