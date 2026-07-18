@@ -1,11 +1,11 @@
 GitPython==3.1.44
-Pillow==12.2.0
+Pillow==12.3.0
 pillow-jxl-plugin
-accelerate==1.13.0
+accelerate==1.14.0
 blendmodes==2025
 numpy==2.5.1
 clean-fid==0.1.35
-diffusers==0.38.0
+diffusers>=0.39.0
 diskcache==5.6.3
 einops==0.8.1
 # facexlib==0.3.0  # omitted: numba 0.66 rejects numpy>=2.5 at import; GFPGAN/CodeFormer face helper unavailable until numba supports 2.5

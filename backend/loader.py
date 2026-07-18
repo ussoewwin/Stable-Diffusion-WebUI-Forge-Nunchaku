@@ -73,6 +73,9 @@ def _load_krea2_mixed_precision_unet(
     Forge Neo equivalent: detect comfy_quant → mixed_precision_ops + bf16 storage
     (UI float8_e4m3fn must not cast-destroy QuantizedTensor → noise).
     """
+    from backend.patch_comfy_quant_layout_fallback import ensure_comfy_quant_layout_fallback_patch
+
+    ensure_comfy_quant_layout_fallback_patch()
     import comfy.ops
     import comfy.model_management as cmm
 
@@ -178,7 +181,11 @@ def _te_filter_prefixes(guess, clip_key: str) -> list[str]:
 
 
 def _comfy_load_te(guess, state_dict, clip_key: str, layer_probe: str, spiece_from_guess: bool = False, clip_type=None):
+    from backend.patch_comfy_quant_layout_fallback import ensure_comfy_quant_layout_fallback_patch
     from comfy.sd import load_text_encoder_state_dicts
+
+    # Issue #3: quantized TE (*.comfy_quant) crashes when get_layout_class → None
+    ensure_comfy_quant_layout_fallback_patch()
 
     if not isinstance(state_dict, dict) or len(state_dict) <= 16:
         return None
@@ -998,6 +1005,14 @@ def forge_loader(sd: os.PathLike, additional_state_dicts: list[os.PathLike] = No
 
         display(e, "forge_loader")
         raise ValueError("Failed to recognize model type!") from e
+
+    # Issue #3: before any MixedPrecision TE/UNet load (kitchen layout may be None)
+    try:
+        from backend.patch_comfy_quant_layout_fallback import ensure_comfy_quant_layout_fallback_patch
+
+        ensure_comfy_quant_layout_fallback_patch()
+    except Exception as e:
+        print(f"[Forge] quant layout fallback patch skipped: {e}")
 
     repo_name = estimated_config.huggingface_repo
 
