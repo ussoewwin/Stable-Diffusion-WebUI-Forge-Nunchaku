@@ -463,9 +463,10 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 guess, (model_list.Anima, model_list.AnimaBase, model_list.AnimaWai68)
             ):
                 from comfy.ldm.anima.model import Anima
-                from backend.nn.comfy_anima import remap_anima_state_dict
+                from backend.nn.comfy_anima import install_anima_rms_rope_fuse, remap_anima_state_dict
                 import comfy.ops
 
+                install_anima_rms_rope_fuse()
                 if isinstance(state_dict, dict):
                     state_dict = remap_anima_state_dict(state_dict)
                 for _k in ("dim", "n_layers", "rope_axis_dim"):
