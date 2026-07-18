@@ -11,10 +11,85 @@ import torch
 
 _logged_tags: set[str] = set()
 _fa2_direct_log_shown = False
+_sa2_call_log_shown = False
+_sa3_call_log_shown = False
 
 # UI choices (GPU Weights row). Default = pytorch SDPA.
 ATTENTION_UI_CHOICES = ("Default", "SA2", "SA3", "FA2")
 ATTENTION_UI_DEFAULT = "Default"
+
+
+def attention_sa2_with_forge_log(
+    q,
+    k,
+    v,
+    heads,
+    mask=None,
+    attn_precision=None,
+    skip_reshape=False,
+    skip_output_reshape=False,
+    **kwargs,
+):
+    """SA2 path with the same first-call ``[Forge] … called`` line as FA-2."""
+    global _sa2_call_log_shown
+    import comfy.ldm.modules.attention as comfy_attention
+
+    out = comfy_attention.attention_sage(
+        q,
+        k,
+        v,
+        heads,
+        mask=mask,
+        attn_precision=attn_precision,
+        skip_reshape=skip_reshape,
+        skip_output_reshape=skip_output_reshape,
+        **kwargs,
+    )
+    if not _sa2_call_log_shown:
+        sa_ver, _, _ = get_sage_attention_info()
+        ver = sa_ver or "?"
+        line = f"[Forge] SA2 (SageAttention {ver}) called"
+        print(line)
+        logging.info(line)
+        _sa2_call_log_shown = True
+    return out
+
+
+def attention_sa3_with_forge_log(
+    q,
+    k,
+    v,
+    heads,
+    mask=None,
+    attn_precision=None,
+    skip_reshape=False,
+    skip_output_reshape=False,
+    **kwargs,
+):
+    """SA3 path with the same first-call ``[Forge] … called`` line as FA-2."""
+    global _sa3_call_log_shown
+    import comfy.ldm.modules.attention as comfy_attention
+
+    out = comfy_attention.attention3_sage(
+        q,
+        k,
+        v,
+        heads,
+        mask=mask,
+        attn_precision=attn_precision,
+        skip_reshape=skip_reshape,
+        skip_output_reshape=skip_output_reshape,
+        **kwargs,
+    )
+    if not _sa3_call_log_shown:
+        sa3_ver, _, sa3_bw = get_sage_attention3_info()
+        ver = sa3_ver or "?"
+        bw = " Blackwell FP4" if sa3_bw else ""
+        line = f"[Forge] SA3 (SageAttention3 {ver}{bw}) called"
+        print(line)
+        logging.info(line)
+        _sa3_call_log_shown = True
+    return out
 
 
 def attention_fa2_direct(
@@ -220,8 +295,17 @@ def _describe_active(fn_name: str) -> str:
     sa_ver, cuda_ver, torch_ver = get_sage_attention_info()
     sa3_ver, sa3_ok, sa3_bw = get_sage_attention3_info()
 
-    if fn_name in ("attention_sage", "attention3_sage") or "sage" in fn_name.lower():
-        if "3" in fn_name or fn_name == "attention3_sage":
+    if fn_name in (
+        "attention_sage",
+        "attention3_sage",
+        "attention_sa2_with_forge_log",
+        "attention_sa3_with_forge_log",
+    ) or "sage" in fn_name.lower():
+        if (
+            fn_name in ("attention3_sage", "attention_sa3_with_forge_log")
+            or "sa3" in fn_name.lower()
+            or ("3" in fn_name and "sa2" not in fn_name.lower())
+        ):
             if sa3_ver and sa3_ver != "unknown":
                 return f"SageAttention3 {sa3_ver} (Blackwell FP4)" if sa3_bw else f"SageAttention3 {sa3_ver}"
             return "SageAttention3 (Blackwell FP4)" if sa3_bw else "SageAttention3"
@@ -253,9 +337,11 @@ def _describe_active(fn_name: str) -> str:
 
 def clear_attention_log_once_flags():
     """Allow the next load/first_forward to print again after a UI switch."""
-    global _fa2_direct_log_shown
+    global _fa2_direct_log_shown, _sa2_call_log_shown, _sa3_call_log_shown
     _logged_tags.clear()
     _fa2_direct_log_shown = False
+    _sa2_call_log_shown = False
+    _sa3_call_log_shown = False
     try:
         import comfy.ldm.krea2.model as krea2_model
 
@@ -336,13 +422,13 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
                 print(msg)
                 logging.warning(msg)
                 return mode
-            target = comfy_attention.attention3_sage
+            target = attention_sa3_with_forge_log
             if sa3_ver and sa3_ver != "unknown":
                 label = f"SageAttention3 {sa3_ver}" + (" (Blackwell FP4)" if sa3_bw else "")
             else:
                 label = "SageAttention3 (Blackwell FP4)" if sa3_bw else "SageAttention3"
         elif use_sage:
-            target = comfy_attention.attention_sage
+            target = attention_sa2_with_forge_log
             label = "SageAttention (SA2)"
         elif use_flash:
             target = attention_fa2_direct
@@ -379,11 +465,9 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
 
         if target is None:
             if use_sage3:
-                import comfy.ldm.modules.attention as comfy_attention
-
-                target = comfy_attention.attention3_sage
-            elif use_sage and hasattr(forge_attention, "attention_sage"):
-                target = forge_attention.attention_sage
+                target = attention_sa3_with_forge_log
+            elif use_sage:
+                target = attention_sa2_with_forge_log
             elif use_flash:
                 target = attention_fa2_direct
             elif hasattr(forge_attention, "attention_pytorch"):
