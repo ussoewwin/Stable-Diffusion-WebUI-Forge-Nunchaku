@@ -2,8 +2,9 @@
 # Detection helpers mirror ComfyUI-DistorchMemoryManager nodes/sa.py.
 # FA2 UI path follows A1111 md/FA2_direct_load_design.md:
 #   flash_attn_func directly (no xformers) → SDPA fallback.
-# FA-2 / SA2 / SA3 ``[Forge] … called`` lines: once per Generate job
-# (reset_attention_forward_log clears all three flags every process_images_inner).
+# FA-2 / SA2 / SA3 proof logs: only AFTER the real CUDA/Python kernel returns.
+# Never print ``called`` for a pytorch fallback. Once per Generate job
+# (reset_attention_forward_log clears flags every process_images_inner).
 
 from __future__ import annotations
 
@@ -15,10 +16,69 @@ _logged_tags: set[str] = set()
 _fa2_direct_log_shown = False
 _sa2_call_log_shown = False
 _sa3_call_log_shown = False
+_fa2_fail_log_shown = False
+_sa2_fail_log_shown = False
+_sa3_fail_log_shown = False
 
 # UI choices (GPU Weights row). Default = pytorch SDPA.
 ATTENTION_UI_CHOICES = ("Default", "SA2", "SA3", "FA2")
 ATTENTION_UI_DEFAULT = "Default"
+
+
+def _module_file(mod) -> str:
+    return str(getattr(mod, "__file__", None) or "?")
+
+
+def _callable_file(fn) -> str:
+    """Resolve the on-disk path of the callable's defining module (kernel proof)."""
+    try:
+        import importlib
+
+        return _module_file(importlib.import_module(fn.__module__))
+    except Exception:
+        return "?"
+
+
+def _module_version(mod, dist_name: str) -> str:
+    ver = getattr(mod, "__version__", None)
+    if ver:
+        return str(ver)
+    try:
+        import importlib.metadata
+
+        return str(importlib.metadata.version(dist_name))
+    except Exception:
+        return "?"
+
+
+def _log_kernel_ran(flag_name: str, line: str) -> None:
+    """Print proof line once per Generate; ``flag_name`` is a module-global bool name."""
+    g = globals()
+    if g.get(flag_name):
+        return
+    print(line)
+    logging.info(line)
+    g[flag_name] = True
+
+
+def _log_kernel_fail(flag_name: str, line: str) -> None:
+    g = globals()
+    if g.get(flag_name):
+        return
+    print(line)
+    logging.warning(line)
+    g[flag_name] = True
+
+
+def _sdpa_fallback(q, k, v, mask=None, **kwargs):
+    sdpa_extra = {}
+    if kwargs.get("enable_gqa", False):
+        sdpa_extra["enable_gqa"] = True
+    if "scale" in kwargs:
+        sdpa_extra["scale"] = kwargs["scale"]
+    return torch.nn.functional.scaled_dot_product_attention(
+        q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False, **sdpa_extra
+    )
 
 
 def attention_sa2_with_forge_log(
@@ -32,28 +92,86 @@ def attention_sa2_with_forge_log(
     skip_output_reshape=False,
     **kwargs,
 ):
-    """SA2 path: ``[Forge] SA2 … called`` once per Generate (same as FA-2 / SA3)."""
-    global _sa2_call_log_shown
+    """Call ``sageattention.sageattn`` directly; log only after that kernel returns."""
+    import inspect
+
     import comfy.ldm.modules.attention as comfy_attention
 
-    out = comfy_attention.attention_sage(
-        q,
-        k,
-        v,
-        heads,
-        mask=mask,
-        attn_precision=attn_precision,
-        skip_reshape=skip_reshape,
-        skip_output_reshape=skip_output_reshape,
-        **kwargs,
-    )
-    if not _sa2_call_log_shown:
-        sa_ver, _, _ = get_sage_attention_info()
-        ver = sa_ver or "?"
-        line = f"[Forge] SA2 (SageAttention {ver}) called"
-        print(line)
-        logging.info(line)
-        _sa2_call_log_shown = True
+    # Conditions where Comfy also refuses sage — honest SDPA, no fake SA2 line.
+    supports_mask = False
+    try:
+        from sageattention import sageattn as _probe
+
+        supports_mask = "attn_mask" in inspect.signature(_probe).parameters
+    except Exception:
+        pass
+    if kwargs.get("low_precision_attention", True) is False or (mask is not None and not supports_mask):
+        return comfy_attention.attention_pytorch(
+            q, k, v, heads, mask=mask, skip_reshape=skip_reshape, skip_output_reshape=skip_output_reshape, **kwargs
+        )
+
+    if skip_reshape:
+        b, _, _, dim_head = q.shape
+        tensor_layout = "HND"
+        if kwargs.get("enable_gqa", False):
+            k, v = comfy_attention._repeat_kv_for_gqa(k, v, q.shape[-3], -3)
+    else:
+        b, _, dim_head = q.shape
+        dim_head //= heads
+        q, k, v = comfy_attention._reshape_qkv_to_heads(
+            q, k, v, b, heads, dim_head, kwargs.get("enable_gqa", False)
+        )
+        tensor_layout = "NHD"
+
+    if mask is not None:
+        if mask.ndim == 2:
+            mask = mask.unsqueeze(0)
+        if mask.ndim == 3:
+            mask = mask.unsqueeze(1)
+
+    sage_kwargs = {
+        "is_causal": False,
+        "tensor_layout": tensor_layout,
+        "sm_scale": kwargs.get("scale", None),
+        "smooth_k": False,
+    }
+    if mask is not None:
+        sage_kwargs["attn_mask"] = mask
+
+    try:
+        from sageattention import sageattn
+        import sageattention as sageattention_mod
+
+        out = sageattn(q, k, v, **sage_kwargs)
+        # Proof only after the real sageattn entry returns.
+        ver = _module_version(sageattention_mod, "sageattention")
+        path = _callable_file(sageattn)
+        if path == "?":
+            path = _module_file(sageattention_mod)
+        line = (
+            f"[Forge] SA2 kernel ran: {sageattn.__module__}.{sageattn.__name__} "
+            f"ver={ver} file={path}"
+        )
+        _log_kernel_ran("_sa2_call_log_shown", line)
+    except Exception as e:
+        _log_kernel_fail(
+            "_sa2_fail_log_shown",
+            f"[Forge] SA2 kernel NOT used — sageattn failed ({e}); fallback pytorch SDPA",
+        )
+        if tensor_layout == "NHD":
+            q, k, v = map(lambda t: t.transpose(1, 2), (q, k, v))
+        return comfy_attention.attention_pytorch(
+            q, k, v, heads, mask=mask, skip_reshape=True, skip_output_reshape=skip_output_reshape, **kwargs
+        )
+
+    if tensor_layout == "HND":
+        if not skip_output_reshape:
+            out = out.transpose(1, 2).reshape(b, -1, heads * dim_head)
+    else:
+        if skip_output_reshape:
+            out = out.transpose(1, 2)
+        else:
+            out = out.reshape(b, -1, heads * dim_head)
     return out
 
 
@@ -68,29 +186,87 @@ def attention_sa3_with_forge_log(
     skip_output_reshape=False,
     **kwargs,
 ):
-    """SA3 path: ``[Forge] SA3 … called`` once per Generate (same as FA-2 / SA2)."""
-    global _sa3_call_log_shown
+    """Call ``sageattn3_blackwell`` directly; log only after that kernel returns."""
     import comfy.ldm.modules.attention as comfy_attention
 
-    out = comfy_attention.attention3_sage(
-        q,
-        k,
-        v,
-        heads,
-        mask=mask,
-        attn_precision=attn_precision,
-        skip_reshape=skip_reshape,
-        skip_output_reshape=skip_output_reshape,
-        **kwargs,
-    )
-    if not _sa3_call_log_shown:
-        sa3_ver, _, sa3_bw = get_sage_attention3_info()
-        ver = sa3_ver or "?"
-        bw = " Blackwell FP4" if sa3_bw else ""
-        line = f"[Forge] SA3 (SageAttention3 {ver}{bw}) called"
-        print(line)
-        logging.info(line)
-        _sa3_call_log_shown = True
+    def _pytorch():
+        return comfy_attention.attention_pytorch(
+            q,
+            k,
+            v,
+            heads,
+            mask=mask,
+            attn_precision=attn_precision,
+            skip_reshape=skip_reshape,
+            skip_output_reshape=skip_output_reshape,
+            **kwargs,
+        )
+
+    # Same gates as Comfy attention3_sage — no fake SA3 line on skip.
+    if q.device.type != "cuda" or q.dtype not in (torch.float16, torch.bfloat16) or mask is not None:
+        return _pytorch()
+
+    if skip_reshape:
+        B, H, L, D = q.shape
+        if H != heads:
+            return _pytorch()
+        N = q.shape[2]
+        dim_head = D
+    else:
+        B, N, inner_dim = q.shape
+        if inner_dim % heads != 0:
+            return _pytorch()
+        dim_head = inner_dim // heads
+
+    if dim_head >= 256 or N <= 1024:
+        return _pytorch()
+
+    if skip_reshape:
+        q_s = q
+        if kwargs.get("enable_gqa", False):
+            k_s, v_s = comfy_attention._repeat_kv_for_gqa(k, v, H, -3)
+        else:
+            k_s, v_s = k, v
+    else:
+        q_s, k_s, v_s = comfy_attention._reshape_qkv_to_heads(
+            q, k, v, B, heads, dim_head, kwargs.get("enable_gqa", False)
+        )
+        q_s, k_s, v_s = map(lambda t: t.permute(0, 2, 1, 3).contiguous(), (q_s, k_s, v_s))
+        B, H, L, D = q_s.shape
+
+    try:
+        from sageattn3 import sageattn3_blackwell
+        import sageattn3 as sageattn3_mod
+
+        out = sageattn3_blackwell(q_s, k_s, v_s, is_causal=False)
+        ver = _module_version(sageattn3_mod, "sageattn3")
+        try:
+            from sageattn3.blackwell import __version__ as bw_ver
+
+            ver = str(bw_ver)
+        except Exception:
+            pass
+        path = _callable_file(sageattn3_blackwell)
+        if path == "?":
+            path = _module_file(sageattn3_mod)
+        line = (
+            f"[Forge] SA3 kernel ran: {sageattn3_blackwell.__module__}.{sageattn3_blackwell.__name__} "
+            f"ver={ver} file={path}"
+        )
+        _log_kernel_ran("_sa3_call_log_shown", line)
+    except Exception as e:
+        _log_kernel_fail(
+            "_sa3_fail_log_shown",
+            f"[Forge] SA3 kernel NOT used — sageattn3_blackwell failed ({e}); fallback pytorch SDPA",
+        )
+        return _pytorch()
+
+    if skip_reshape:
+        if not skip_output_reshape:
+            out = out.permute(0, 2, 1, 3).reshape(B, L, H * D)
+    else:
+        if not skip_output_reshape:
+            out = out.permute(0, 2, 1, 3).reshape(B, L, H * D)
     return out
 
 
@@ -106,14 +282,9 @@ def attention_fa2_direct(
     **kwargs,
 ):
     """
-    A1111-style Flash-Attention 2 direct load.
-
-    Calls ``flash_attn.flash_attn_func`` directly (no xformers wrapper).
-    Layout for the kernel: (batch, seqlen, nheads, headdim).
-    On failure: fall back to torch SDPA (same chain spirit as A1111 FA → SDP).
+    Call ``flash_attn.flash_attn_func`` directly (no xformers).
+    Proof log only after that kernel returns; SDPA fallback never claims FA-2.
     """
-    global _fa2_direct_log_shown
-
     if skip_reshape:
         b, _, _, dim_head = q.shape
     else:
@@ -135,6 +306,7 @@ def attention_fa2_direct(
             raise RuntimeError("Mask must not be set for Flash-Attention direct")
 
         from flash_attn import flash_attn_func
+        import flash_attn as flash_attn_mod
 
         # Kernel expects (B, L, H, D); Comfy/Forge tensors here are (B, H, L, D).
         q_f = q.transpose(1, 2).contiguous()
@@ -149,31 +321,31 @@ def attention_fa2_direct(
 
         out = flash_attn_func(q_f, k_f, v_f, dropout_p=0.0, causal=False)
 
-        if not _fa2_direct_log_shown:
-            fa_ok, fa_ver, fa_type = get_flash_attention_info()
-            label = fa_type or "FA-2"
-            ver = fa_ver or "?"
-            line = f"[Forge] {label} (Flash-Attention {ver}) called directly"
-            print(line)
-            logging.info(line)
-            _fa2_direct_log_shown = True
+        ver = _module_version(flash_attn_mod, "flash-attn")
+        path = _callable_file(flash_attn_func)
+        if path == "?":
+            path = _module_file(flash_attn_mod)
+        major = 2
+        try:
+            major = int(str(ver).split(".")[0])
+        except Exception:
+            pass
+        label = "FA-3" if major >= 3 else "FA-2"
+        line = (
+            f"[Forge] {label} kernel ran: {flash_attn_func.__module__}.{flash_attn_func.__name__} "
+            f"ver={ver} file={path}"
+        )
+        _log_kernel_ran("_fa2_direct_log_shown", line)
 
         if out.dtype != original_dtype:
             out = out.to(original_dtype)
         out = out.transpose(1, 2)
     except Exception as e:
-        line = f"[Forge] Flash-Attention direct failed: {e}"
-        print(line)
-        logging.warning(line)
-        print("[Forge] Fallback: torch.nn.functional.scaled_dot_product_attention")
-        sdpa_extra = {}
-        if kwargs.get("enable_gqa", False):
-            sdpa_extra["enable_gqa"] = True
-        if "scale" in kwargs:
-            sdpa_extra["scale"] = kwargs["scale"]
-        out = torch.nn.functional.scaled_dot_product_attention(
-            q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False, **sdpa_extra
+        _log_kernel_fail(
+            "_fa2_fail_log_shown",
+            f"[Forge] FA-2 kernel NOT used — flash_attn_func failed ({e}); fallback pytorch SDPA",
         )
+        out = _sdpa_fallback(q, k, v, mask=mask, **kwargs)
 
     if skip_output_reshape:
         return out
@@ -319,10 +491,10 @@ def _describe_active(fn_name: str) -> str:
 
     if fn_name in ("attention_flash", "attention_fa2_direct") or "flash" in fn_name.lower():
         if fa_ok and fa_type and fa_ver:
-            return f"{fa_type} (Flash-Attention {fa_ver}) called directly"
+            return f"{fa_type} (Flash-Attention {fa_ver}) via flash_attn_func"
         if fa_ok and fa_ver:
-            return f"Flash-Attention {fa_ver} called directly"
-        return "Flash-Attention called directly"
+            return f"Flash-Attention {fa_ver} via flash_attn_func"
+        return "Flash-Attention via flash_attn_func"
 
     if fn_name == "attention_xformers" or "xformers" in fn_name.lower():
         return "xformers"
@@ -340,10 +512,14 @@ def _describe_active(fn_name: str) -> str:
 def clear_attention_log_once_flags():
     """Allow the next load/first_forward to print again after a UI switch."""
     global _fa2_direct_log_shown, _sa2_call_log_shown, _sa3_call_log_shown
+    global _fa2_fail_log_shown, _sa2_fail_log_shown, _sa3_fail_log_shown
     _logged_tags.clear()
     _fa2_direct_log_shown = False
     _sa2_call_log_shown = False
     _sa3_call_log_shown = False
+    _fa2_fail_log_shown = False
+    _sa2_fail_log_shown = False
+    _sa3_fail_log_shown = False
     try:
         import comfy.ldm.krea2.model as krea2_model
 
@@ -353,21 +529,23 @@ def clear_attention_log_once_flags():
 
 
 def reset_attention_forward_log():
-    """Reset all per-Generate ``[Forge] … called`` gates — FA-2, SA2, and SA3.
+    """Reset per-Generate kernel proof / fail log gates — FA-2, SA2, and SA3.
 
-    Called at the start of every ``process_images_inner`` so each Generate prints
-    again. Without clearing ``_sa2_call_log_shown`` / ``_sa3_call_log_shown`` /
-    ``_fa2_direct_log_shown``, the second Generate silently drops the line.
-    Still once per job (not once per Attention layer).
+    Called at the start of every ``process_images_inner`` so each Generate can
+    print ``kernel ran`` (or ``kernel NOT used``) again. Still once per job
+    (not once per Attention layer).
     """
     global _fa2_direct_log_shown, _sa2_call_log_shown, _sa3_call_log_shown
+    global _fa2_fail_log_shown, _sa2_fail_log_shown, _sa3_fail_log_shown
     drop = [k for k in list(_logged_tags) if k.endswith("|first_forward")]
     for k in drop:
         _logged_tags.discard(k)
-    # FA-2 / SA2 / SA3 — all three, every Generate. Do not leave any True.
     _fa2_direct_log_shown = False
     _sa2_call_log_shown = False
     _sa3_call_log_shown = False
+    _fa2_fail_log_shown = False
+    _sa2_fail_log_shown = False
+    _sa3_fail_log_shown = False
     try:
         import comfy.ldm.krea2.model as krea2_model
 
@@ -445,7 +623,7 @@ def apply_attention_backend(mode: str, *, log: bool = True) -> str:
             label = "SageAttention (SA2)"
         elif use_flash:
             target = attention_fa2_direct
-            label = f"{fa_type or 'FA-2'} (Flash-Attention {fa_ver or '?'}) called directly"
+            label = f"{fa_type or 'FA-2'} (Flash-Attention {fa_ver or '?'}) via flash_attn_func"
         else:
             target = comfy_attention.attention_pytorch
             label = "pytorch SDPA (Default)"
