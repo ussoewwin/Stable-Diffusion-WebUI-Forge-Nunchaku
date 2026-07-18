@@ -39,7 +39,7 @@ def _patched_compute_qkv(
     context: Optional[object] = None,
     rope_emb: Optional[object] = None,
 ):
-    """Fuse Q/K RMSNorm + split-half RoPE on SelfAttn (classic 2693f93 shape).
+    """Fuse Q/K RMSNorm + split-half RoPE on SelfAttn via ``rms_rope_split_half``.
 
     Scale cast: plan B — cast ``q_norm.weight`` / ``k_norm.weight`` to activation
     dtype/device (Comfy ``operations.RMSNorm`` has no Forge ``weights_manual_cast``).
