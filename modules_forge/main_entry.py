@@ -259,6 +259,52 @@ def refresh_model_loading_parameters():
     processing.need_global_unload = True
 
 
+def _preset_model_slot(preset: str | None) -> str | None:
+    """Slot key for per-preset checkpoint/modules.
+
+    Always prefer ``shared.opts.forge_preset`` when saving. Gradio may pass a stale
+    ``ui_forge_preset`` value into checkpoint/modules change handlers when those
+    fire as a cascade from ``on_preset_change`` (e.g. anima→krea2 would otherwise
+    write the Krea2 checkpoint into ``forge_checkpoint_anima``).
+    """
+    if preset is None:
+        return None
+    slot = getattr(shared.opts, "forge_preset", None) or preset
+    return slot if slot in FORGE_UI_PRESET_VALUES else preset
+
+
+def _read_preset_checkpoint(preset: str) -> str | None:
+    ckpt = getattr(shared.opts, f"forge_checkpoint_{preset}", None)
+    if ckpt in (None, "", "None", "none"):
+        return None
+    return ckpt
+
+
+def _read_preset_modules(preset: str) -> list:
+    raw = getattr(shared.opts, f"forge_additional_modules_{preset}", None) or []
+    return list(raw)
+
+
+def _resolve_module_paths(module_values: list) -> list:
+    modules = []
+    for v in module_values:
+        module_name = os.path.basename(v)
+        if module_name in module_list:
+            modules.append(module_list[module_name])
+    return modules
+
+
+def _apply_preset_models(preset: str) -> tuple[str | None, list[str]]:
+    """Load per-preset checkpoint/VAE-TE into active opts (do not rely on Gradio cascade)."""
+    ckpt = _read_preset_checkpoint(preset)
+    stored = _read_preset_modules(preset)
+    if ckpt is not None:
+        shared.opts.set("sd_model_checkpoint", ckpt)
+    shared.opts.set("forge_additional_modules", _resolve_module_paths(stored))
+    refresh_model_loading_parameters()
+    return ckpt, [os.path.basename(x) for x in stored]
+
+
 def checkpoint_change(ckpt_name: str, preset: str, save=True, refresh=True) -> bool:
     """`ckpt_name` accepts valid aliases; returns `True` if checkpoint changed"""
     new_ckpt_info = sd_models.get_closet_checkpoint_match(ckpt_name)
@@ -267,8 +313,9 @@ def checkpoint_change(ckpt_name: str, preset: str, save=True, refresh=True) -> b
         return False
 
     shared.opts.set("sd_model_checkpoint", ckpt_name)
-    if preset is not None:
-        shared.opts.set(f"forge_checkpoint_{preset}", ckpt_name)
+    slot = _preset_model_slot(preset)
+    if slot is not None:
+        shared.opts.set(f"forge_checkpoint_{slot}", ckpt_name)
 
     if save:
         shared.opts.save(shared.config_filename)
@@ -279,19 +326,18 @@ def checkpoint_change(ckpt_name: str, preset: str, save=True, refresh=True) -> b
 
 def modules_change(module_values: list, preset: str, save=True, refresh=True) -> bool:
     """`module_values` accepts file paths or just the module names; returns `True` if modules changed"""
-    modules = []
-    for v in module_values:
-        module_name = os.path.basename(v)  # If the input is a filepath, extract the file name
-        if module_name in module_list:
-            modules.append(module_list[module_name])
+    modules = _resolve_module_paths(module_values)
 
     # skip further processing if value unchanged
     if sorted(modules) == sorted(shared.opts.data.get("forge_additional_modules", [])):
         return False
 
+    # Copy lists so per-preset slots do not share one mutable reference with the active opt.
+    modules = list(modules)
     shared.opts.set("forge_additional_modules", modules)
-    if preset is not None:
-        shared.opts.set(f"forge_additional_modules_{preset}", modules)
+    slot = _preset_model_slot(preset)
+    if slot is not None:
+        shared.opts.set(f"forge_additional_modules_{slot}", list(modules))
 
     if save:
         shared.opts.save(shared.config_filename)
@@ -390,7 +436,6 @@ def _resolve_preset_scheduler(preset: str, mode: str) -> str:
 def on_preset_change(preset: str):
     assert preset is not None
     shared.opts.set("forge_preset", preset)
-    shared.opts.save(shared.config_filename)
 
     model_mem = getattr(shared.opts, f"{preset}_gpu_mb", total_vram - 1024)
     if model_mem < 0 or model_mem > total_vram:
@@ -403,10 +448,14 @@ def on_preset_change(preset: str):
     d_label = "Distilled CFG Scale" if preset == "flux" else "Shift"
     batch_args = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch size", "value": 1}
 
-    additional_modules = [os.path.basename(x) for x in getattr(shared.opts, f"forge_additional_modules_{preset}", [])]
+    # Apply models here. Do not pass value=None into the checkpoint Dropdown — that
+    # breaks Gradio batch updates so VAE/TE also stay on the previous preset.
+    ckpt, additional_modules = _apply_preset_models(preset)
+    shared.opts.save(shared.config_filename)
+    ckpt_update = gr.update(value=ckpt) if ckpt is not None else gr.update()
 
     return [
-        gr.update(value=getattr(shared.opts, f"forge_checkpoint_{preset}", shared.opts.sd_model_checkpoint)),  # ui_checkpoint
+        ckpt_update,  # ui_checkpoint
         gr.update(value=additional_modules),  # ui_vae
         gr.update(visible=show_clip_skip, value=getattr(shared.opts, "CLIP_stop_at_last_layers", 2)),  # ui_clip_skip
         gr.update(visible=show_basic_mem, value=getattr(shared.opts, "forge_unet_storage_dtype", "Automatic")),  # ui_forge_unet_storage_dtype_options
