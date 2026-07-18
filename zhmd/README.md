@@ -84,6 +84,7 @@
   - Forge checkpoint 面板中的专用 **UI Preset: Anima**
   - 加载 **Additional modules**：`qwen_3_06b_base.safetensors`（Qwen3 文本编码器）、`qwen_image_vae.safetensors`（Qwen-Image VAE）
   - 用于 `llm_adapter` cross-attention 的 T5 tokenizer 词汇表（无需单独的 T5/UMT5 权重文件）
+  - Anima 请**不要**使用 Attention **`SA2` / `SA3`**——会导致画面损坏。请改用 **`Default`** 或 **`FA2`**。
 
   <p align="left">
     <img src="../png/anima.png" alt="Anima UI preset and txt2img example" width="400">

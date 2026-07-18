@@ -84,6 +84,7 @@
   - Dedicated **UI Preset: Anima** in the Forge checkpoint panel
   - Load **Additional modules**: `qwen_3_06b_base.safetensors` (Qwen3 text encoder), `qwen_image_vae.safetensors` (Qwen-Image VAE)
   - T5 tokenizer vocabulary for `llm_adapter` cross-attention (no separate T5/UMT5 weight file required)
+  - Do **not** use Attention **`SA2` / `SA3`** with Anima — they break the image. Use **`Default`** or **`FA2`** instead.
 
   <p align="left">
     <img src="png/anima.png" alt="Anima UI preset and txt2img example" width="400">
