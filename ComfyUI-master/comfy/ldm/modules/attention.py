@@ -771,46 +771,29 @@ def attention_flash(q, k, v, heads, mask=None, attn_precision=None, skip_reshape
     return out
 
 
-# Stable dispatcher: ``from ... import optimized_attention(_masked)`` stays valid after UI switch.
-_optimized_attention_impl = attention_basic
+optimized_attention = attention_basic
 
 if model_management.sage_attention_enabled():
     logging.info("Using sage attention")
-    _optimized_attention_impl = attention_sage
+    optimized_attention = attention_sage
 elif model_management.flash_attention_enabled():
     logging.info("Using Flash Attention")
-    _optimized_attention_impl = attention_flash
+    optimized_attention = attention_flash
 elif model_management.xformers_enabled():
     logging.info("Using xformers attention")
-    _optimized_attention_impl = attention_xformers
+    optimized_attention = attention_xformers
 elif model_management.pytorch_attention_enabled():
     logging.info("Using pytorch attention")
-    _optimized_attention_impl = attention_pytorch
+    optimized_attention = attention_pytorch
 else:
     if args.use_split_cross_attention:
         logging.info("Using split optimization for attention")
-        _optimized_attention_impl = attention_split
+        optimized_attention = attention_split
     else:
         logging.info("Using sub quadratic optimization for attention, if you have memory or speed issues try using: --use-split-cross-attention")
-        _optimized_attention_impl = attention_sub_quad
+        optimized_attention = attention_sub_quad
 
-
-def optimized_attention(*args, **kwargs):
-    return _optimized_attention_impl(*args, **kwargs)
-
-
-def optimized_attention_masked(*args, **kwargs):
-    return _optimized_attention_impl(*args, **kwargs)
-
-
-def set_optimized_attention_impl(fn):
-    """Runtime Attention UI: rebind without breaking import-time call sites."""
-    global _optimized_attention_impl
-    _optimized_attention_impl = fn
-
-
-def get_optimized_attention_impl():
-    return _optimized_attention_impl
+optimized_attention_masked = optimized_attention
 
 
 # register core-supported attention functions

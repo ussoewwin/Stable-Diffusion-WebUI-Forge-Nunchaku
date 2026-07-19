@@ -19,8 +19,6 @@ from comfy.ldm.flux.layers import EmbedND, timestep_embedding
 from comfy.ldm.flux.math import apply_rope
 from comfy.ldm.modules.attention import optimized_attention_masked
 
-_krea2_attn_logged = False
-
 
 class RMSNorm(nn.Module):
     """RMSNorm with the reference ``(1 + scale)`` weight convention (scale stored zero-centered)."""
@@ -75,20 +73,6 @@ class Attention(nn.Module):
         self.wo = operations.Linear(dim, dim, bias=bias, device=device, dtype=dtype)
 
     def forward(self, x, freqs=None, mask=None, transformer_options={}):
-        global _krea2_attn_logged
-        if not _krea2_attn_logged:
-            _krea2_attn_logged = True
-            try:
-                from backend.attention_backend_info import log_comfy_attention_backend
-
-                log_comfy_attention_backend(
-                    tag="[Krea2]",
-                    transformer_options=transformer_options,
-                    once=True,
-                    when="first_forward",
-                )
-            except Exception as e:
-                print(f"[Krea2][Attention] first_forward log failed: {e}")
         q, k, v, gate = self.wq(x), self.wk(x), self.wv(x), self.gate(x)
         q = rearrange(q, "B L (H D) -> B H L D", H=self.heads)
         k = rearrange(k, "B L (H D) -> B H L D", H=self.kvheads)
