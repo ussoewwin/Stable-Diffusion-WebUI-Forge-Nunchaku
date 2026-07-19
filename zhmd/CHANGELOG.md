@@ -13,7 +13,7 @@
   - 将内嵌的 **`ComfyUI-master`** 同步到 Forge 导入所用的最新上游树（JoyImage、Anima LLLite、API 节点、模型检测及相关测试等）。
   - 将该树配套的 kitchen 固定为 **`comfy-kitchen==0.2.22`**（`ComfyUI-master/requirements.txt`）；Forge 运行时仍由仓库根目录 **`requirements.txt`** 安装（`comfy-kitchen>=0.2.21`）。
   - 使远程安装可获得 **`TensorCoreConvRotW4A4Layout`** / INT8 ConvRot 等 kitchen layout，避免因旧版 kitchen 导入失败而整段量化路径失效。
-  - 详情请参阅 [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.5)。
+  - 详情请参阅 [Release Notes（中文）](v1.8.5.md)。
 
 ## Version 1.8.4
 
