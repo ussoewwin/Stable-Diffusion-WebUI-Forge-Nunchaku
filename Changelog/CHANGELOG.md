@@ -7,6 +7,14 @@
   </tr>
 </table>
 
+## Version 1.8.5
+
+- **ComfyUI-master sync and comfy-kitchen bump**
+  - Synced vendored **`ComfyUI-master`** to the latest upstream tree used for Forge imports (JoyImage, Anima LLLite, API nodes, model detection, and related tests).
+  - Raised the kitchen pin used with that tree to **`comfy-kitchen==0.2.22`** in `ComfyUI-master/requirements.txt`; Forge runtime continues to install from root **`requirements.txt`** (`comfy-kitchen>=0.2.21`).
+  - Ensures remote installs can pick up kitchen layouts such as **`TensorCoreConvRotW4A4Layout`** / INT8 ConvRot support instead of failing on an older kitchen import.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.5) for details.
+
 ## Version 1.8.4
 
 - **Krea2: quantized TE load fallback when `layout_cls` is None**
