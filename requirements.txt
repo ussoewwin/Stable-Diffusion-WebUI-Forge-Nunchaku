@@ -25,7 +25,7 @@ open-clip-torch==2.32.0
 opencv-python>=4.9.0
 matplotlib
 pywavelets
-comfy-kitchen>=0.2.21
+comfy-kitchen>=0.2.22
 tokenizers>=0.13.3
 sentencepiece
 aiohttp>=3.11.8
