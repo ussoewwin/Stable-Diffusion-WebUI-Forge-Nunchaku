@@ -7,6 +7,15 @@
   </tr>
 </table>
 
+## Version 1.8.6
+
+- **修复：根目录 `comfy-kitchen` 固定升级至 `>=0.2.22`（如实修正 v1.8.5 的失误）**
+  - v1.8.5 仅在 **`ComfyUI-master/requirements.txt`** 中提升了 kitchen 固定版本，但 Forge 运行时是从**仓库根目录 `requirements.txt`** 安装的，而该文件仍停留在 **`comfy-kitchen>=0.2.21`**。因此运行时仍解析到 `0.2.21`，本应生效的修复完全没有生效。
+  - 在 `0.2.21` 下，`ComfyUI-master/comfy/quant_ops.py` 中的 `from comfy_kitchen import TensorCoreConvRotW4A4Layout` 会导入失败；由于只有一个 `try` 块，`_CK_AVAILABLE` 被置为 `False`，导致所有 kitchen layout 失效，并触发 `backend/patch_comfy_quant_layout_fallback.py` 的 dequant 回退。量化的 KREA2（int8/fp8 ConvRot）权重被 dequant 为 bf16，耗尽内存（最高约 64 GB）。
+  - 本次发布将**根目录 `requirements.txt`** 提升为 **`comfy-kitchen>=0.2.22`**，使运行时安装正确版本，量化 layout 得以正常导入。
+  - **用户操作：** 执行一次 **`pip install -U comfy-kitchen`** —— 直接 `pip install -r requirements.txt` 不会升级，因为 `0.2.21` 已满足 `>=0.2.21`。
+  - 详情请参阅 [Release Notes（中文）](v1.8.6.md)。
+
 ## Version 1.8.5
 
 - **ComfyUI-master 同步与 comfy-kitchen 升级**

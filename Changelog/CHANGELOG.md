@@ -7,6 +7,15 @@
   </tr>
 </table>
 
+## Version 1.8.6
+
+- **Fix: root `comfy-kitchen` pin bumped to `>=0.2.22` (honest correction of the v1.8.5 miss)**
+  - v1.8.5 only raised the kitchen pin in **`ComfyUI-master/requirements.txt`**, but the Forge runtime installs from the **root `requirements.txt`**, which was left at **`comfy-kitchen>=0.2.21`**. The runtime kept resolving to `0.2.21`, so the intended fix never took effect.
+  - Under `0.2.21`, `from comfy_kitchen import TensorCoreConvRotW4A4Layout` fails in `ComfyUI-master/comfy/quant_ops.py`; a single `try` block then sets `_CK_AVAILABLE = False`, disabling every kitchen layout and forcing the dequant fallback in `backend/patch_comfy_quant_layout_fallback.py`. Quantized KREA2 (int8/fp8 ConvRot) weights get dequantized to bf16, exhausting RAM (up to ~64 GB).
+  - This release bumps the **root `requirements.txt`** to **`comfy-kitchen>=0.2.22`** so the runtime installs the correct version and the quantized layouts import successfully.
+  - **User action:** run **`pip install -U comfy-kitchen`** once — a plain `pip install -r requirements.txt` will not upgrade, because `0.2.21` already satisfies `>=0.2.21`.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v1.8.6) for details.
+
 ## Version 1.8.5
 
 - **ComfyUI-master sync and comfy-kitchen bump**
