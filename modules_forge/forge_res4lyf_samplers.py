@@ -2,9 +2,12 @@
 Forge integration for RES4LYF samplers and schedulers
 """
 
+import functools
+import importlib
 import logging
 import os
 import sys
+from contextlib import contextmanager
 from typing import Callable
 
 import k_diffusion.sampling
@@ -16,15 +19,99 @@ from modules import sd_samplers_common, sd_samplers_kdiffusion, sd_schedulers
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def res4lyf_data_prev_zeros_patch():
+    """Grow RES4LYF ``data_prev_*`` buffers from size 4 to 8 for hybrid ``*4h4s``.
+
+    RES4LYF allocates ``data_prev_`` / ``data_prev_x_`` / ``data_prev_y_`` as
+    ``torch.zeros(4, *x.shape, ...)`` (``rk_sampler_beta.py``). For hybrid
+    samplers like ``lawson45-gen-mod_4h4s`` where ``hybrid_stages = 4``,
+    ``recycled_stages`` becomes 4 and the rotation loop writes
+    ``data_prev_[4]`` → ``IndexError`` (size 4, valid 0..3).
+
+    Same approach as A1111 ``a1111_res4lyf_shim.res4lyf_shim_context`` §3:
+    do not edit ``modules/RES4LYF/``; temporarily replace ``torch`` only on
+    the ``rk_sampler_beta`` module so leading-dim ``4`` zeros become ``8``.
+    """
+    rk_sampler_beta_mod = None
+    try:
+        for _modname in (
+            "modules.RES4LYF.beta.rk_sampler_beta",
+            "RES4LYF.beta.rk_sampler_beta",
+            "beta.rk_sampler_beta",
+        ):
+            _m = sys.modules.get(_modname)
+            if _m is not None:
+                rk_sampler_beta_mod = _m
+                break
+        if rk_sampler_beta_mod is None:
+            for _modname in (
+                "modules.RES4LYF.beta.rk_sampler_beta",
+                "RES4LYF.beta.rk_sampler_beta",
+                "beta.rk_sampler_beta",
+            ):
+                try:
+                    rk_sampler_beta_mod = importlib.import_module(_modname)
+                    break
+                except Exception:
+                    continue
+    except Exception:
+        rk_sampler_beta_mod = None
+
+    zeros_patched = False
+    _rk_torch = None
+    if rk_sampler_beta_mod is not None:
+        try:
+            _rk_torch = rk_sampler_beta_mod.torch
+            _orig_torch_zeros = _rk_torch.zeros
+
+            def _patched_zeros(*args, **kwargs):
+                if args and isinstance(args[0], int) and args[0] == 4:
+                    args = (8,) + args[1:]
+                return _orig_torch_zeros(*args, **kwargs)
+
+            class _TorchProxy:
+                def __getattr__(self, name):
+                    return getattr(_rk_torch, name)
+
+                def zeros(self, *args, **kwargs):
+                    return _patched_zeros(*args, **kwargs)
+
+            rk_sampler_beta_mod.torch = _TorchProxy()
+            zeros_patched = True
+        except Exception:
+            logger.debug(
+                "[RES4LYF] Failed to patch rk_sampler_beta.torch.zeros",
+                exc_info=True,
+            )
+
+    try:
+        yield
+    finally:
+        if zeros_patched and rk_sampler_beta_mod is not None:
+            try:
+                rk_sampler_beta_mod.torch = _rk_torch
+            except Exception:
+                logger.debug(
+                    "[RES4LYF] restore rk_sampler_beta.torch failed",
+                    exc_info=True,
+                )
+
+
 class RES4LYFSampler(sd_samplers_kdiffusion.KDiffusionSampler):
     """Wrapper for RES4LYF samplers"""
-    
+
     def __init__(self, sd_model, sampler_name):
         sampler_function: Callable = getattr(k_diffusion.sampling, f"sample_{sampler_name}", None)
         if sampler_function is None:
             raise ValueError(f"Unknown RES4LYF sampler: {sampler_name}")
 
-        super().__init__(sampler_function, sd_model, None)
+        def wrapped_sampler(*args, **kwargs):
+            with res4lyf_data_prev_zeros_patch():
+                return sampler_function(*args, **kwargs)
+
+        functools.update_wrapper(wrapped_sampler, sampler_function)
+        super().__init__(wrapped_sampler, sd_model, None)
 
 
 def build_res4lyf_constructor(sampler_key: str) -> Callable:
