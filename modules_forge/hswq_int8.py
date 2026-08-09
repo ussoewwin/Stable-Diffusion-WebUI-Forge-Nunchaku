@@ -1,7 +1,7 @@
 # Forge INT8 Low Bits — UI-only separate branch.
 # Entry: Low Bits "int8" or "int8 (fp16 LoRA)" → forge_unet_storage_dtype == int8_tensorwise.
 # Never auto-detect from checkpoint / Automatic. Never share float8 / bnb construct.
-# Imports comfy_quant patches from modules/ComfyUI-nunchaku-unofficial-loader only.
+# Imports comfy_quant patches from modules/ComfyUI-HSWQ-Loader-and-Tools only.
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _LOG = "[HSWQ INT8]"
 _LOADER_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "modules",
-    "ComfyUI-nunchaku-unofficial-loader",
+    "ComfyUI-HSWQ-Loader-and-Tools",
 )
 
 
