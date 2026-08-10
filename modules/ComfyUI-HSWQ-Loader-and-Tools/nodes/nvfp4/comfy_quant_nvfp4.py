@@ -375,7 +375,9 @@ def apply_comfy_quant_nvfp4_patches() -> bool:
 NVFP4_WEIGHT_DTYPE = "ConvRot NVFP4"
 
 
-def load_checkpoint_sdxl_nvfp4_weight_dtype(ckpt_name, weight_dtype, device=None):
+def load_checkpoint_sdxl_nvfp4_weight_dtype(
+    ckpt_name, weight_dtype, device=None
+):
     """Load SDXL checkpoint with HSWQ NVFP4 Linear (+ INT8 Conv2d ConvRot) stack."""
     import sys
 
@@ -405,16 +407,22 @@ def load_checkpoint_sdxl_nvfp4_weight_dtype(ckpt_name, weight_dtype, device=None
         apply_comfy_quant_int8_patches()
         reset_int8_lora_log_counters()
         reset_nvfp4_lora_log_counters()
-        from .nvfp4_conf import is_blackwell_gpu
-        if is_blackwell_gpu():
+        from .nvfp4_conf import is_blackwell_gpu, is_nvfp4_cudagraph_enabled
+        from .nvfp4_runtime import clear_nvfp4_cudagraphs
+        _bw = is_blackwell_gpu()
+        _cg = is_nvfp4_cudagraph_enabled()
+        if not _cg:
+            clear_nvfp4_cudagraphs()
+
+        if _cg:
             _console(
-                "[HSWQ NVFP4 Tensor Boost] Blackwell GPU (SM >= 100) DETECTED: "
-                "Per-Weight CUDA Graph Tensor Boost ACTIVE"
+                "[HSWQ NVFP4 Tensor Boost] Tensor Boost Toggle ON: "
+                "CUDA Graph Tensor Boost ACTIVE"
             )
         else:
-            sdxl_logger.info(
-                "[HSWQ NVFP4] Non-Blackwell GPU (SM < 100): "
-                "Standard SDXL NVFP4 Product path ACTIVE"
+            _console(
+                "[HSWQ NVFP4 Tensor Boost] Tensor Boost Toggle OFF: "
+                "Eager Pooled Path ACTIVE (Graph arenas cleared)"
             )
         sdxl_logger.info(
             "[SDXL NVFP4] Loading checkpoint via MixedPrecisionOps "
