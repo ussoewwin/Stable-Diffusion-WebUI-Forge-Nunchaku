@@ -7,6 +7,24 @@
   </tr>
 </table>
 
+## Version 2.0.0
+
+- **全面升级为仅支持 Python 3.14 与多平台兼容性支持**
+  - 将 Windows 与 Linux 运行环境全面升级为 **Python 3.14 专属支持**（基于 CUDA 13.2 / PyTorch 2.13 架构）。
+  - 集成 Python 3.14 运行时所需的 Universal Wheel 自动安装与依赖适配：
+    - **`distutils`**（`distutils-3.14.0-py3-none-any.whl`）
+    - **`pyaudioop`**（`pyaudioop-1.0.0-py3-none-any.whl`）
+    - **`imghdr`**（`imghdr-1.0.0-py3-none-any.whl`）
+    - **`facexlib`**（`facexlib-0.3.0-py3-none-any.whl`，剥离 numba/filterpy 强绑定并内置 `version.py` 的 Pure Python 定制版）
+    - **`gradio 4.40.0`**（`gradio-4.40.0-py3-none-any.whl`，解除 numpy 等版本约束并适配 OpenAPI 布尔 schema）
+  - 提供 Python 3.14 / CUDA 13.2 专用的 **Nunchaku 1.3.0** 预编译 Wheel：
+    - Windows：`nunchaku-1.3.0.dev20260619+cu13.2torch2.12-cp314-cp314-win_amd64.whl`
+    - Linux：`nunchaku-1.3.0.dev20260829+cu13.2torch2.13-cp314-cp314-linux_x86_64.whl`
+  - 完整集成 **SageAttention 3（SA3 / Blackwell FP4）**、**SageAttention 2（SA2）** 与 **FlashAttention 2（FA2）** Attention 后端。
+  - 新增 `torchaudio` 运行时兼容层（基于 ModuleSpec Stub），消除 Python 3.14 导入异常。
+  - 修复 `StableDiffusionProcessing.sd_model` 属性同步机制与 `modules/shared.py` 变量遮蔽问题。
+  - 详情请参阅 [Release Notes（中文）](v2.0.0.md)。
+
 ## Version 1.8.6
 
 - **修复：根目录 `comfy-kitchen` 固定升级至 `>=0.2.22`（如实修正 v1.8.5 的失误）**

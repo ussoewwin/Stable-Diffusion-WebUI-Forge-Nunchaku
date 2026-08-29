@@ -7,6 +7,24 @@
   </tr>
 </table>
 
+## Version 2.0.0
+
+- **Python 3.14 Exclusive Support & Platform Compatibility Update**
+  - Upgraded runtime environment exclusively to **Python 3.14** across Windows and Linux (CUDA 13.2 / PyTorch 2.13 stack).
+  - Bundled automated universal wheel installation for Python 3.14 runtime requirements:
+    - **`distutils`** (`distutils-3.14.0-py3-none-any.whl`)
+    - **`pyaudioop`** (`pyaudioop-1.0.0-py3-none-any.whl`)
+    - **`imghdr`** (`imghdr-1.0.0-py3-none-any.whl`)
+    - **`facexlib`** (`facexlib-0.3.0-py3-none-any.whl`, pure Python dependency-stripped build with embedded `version.py`)
+    - **`gradio 4.40.0`** (`gradio-4.40.0-py3-none-any.whl` with unpinned dependencies and OpenAPI boolean schema compatibility)
+  - Dedicated **Nunchaku 1.3.0** prebuilt wheels for Python 3.14 on CUDA 13.2:
+    - Windows: `nunchaku-1.3.0.dev20260619+cu13.2torch2.12-cp314-cp314-win_amd64.whl`
+    - Linux: `nunchaku-1.3.0.dev20260829+cu13.2torch2.13-cp314-cp314-linux_x86_64.whl`
+  - Integrated **SageAttention 3 (SA3 / Blackwell FP4)**, **SageAttention 2 (SA2)**, and **FlashAttention 2 (FA2)** attention backends.
+  - Added built-in `torchaudio` compatibility module with standard ModuleSpec stub for Python 3.14.
+  - Stabilized `StableDiffusionProcessing.sd_model` synchronization and eliminated module shadowing in `modules/shared.py`.
+  - See [Release Notes](https://github.com/ussoewwin/Stable-Diffusion-WebUI-Forge-Nunchaku/releases/tag/v2.0.0) for details.
+
 ## Version 1.8.6
 
 - **Fix: root `comfy-kitchen` pin bumped to `>=0.2.22` (honest correction of the v1.8.5 miss)**
