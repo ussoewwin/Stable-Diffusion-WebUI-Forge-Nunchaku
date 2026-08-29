@@ -105,8 +105,70 @@ def _patch_diffusers_flash_attn_flag(mod):
               "marked unavailable (will be reinstalled on next launch with --flash)")
 
 
+def _patch_gradio_client(mod):
+    orig_json_schema = getattr(mod, "_json_schema_to_python_type", None)
+    if orig_json_schema is not None and not getattr(orig_json_schema, "_is_patched", False):
+        def safe_json_schema_to_python_type(schema, defs=None):
+            if isinstance(schema, bool):
+                return "Any" if schema else "None"
+            if not isinstance(schema, dict):
+                return "Any"
+            return orig_json_schema(schema, defs)
+        safe_json_schema_to_python_type._is_patched = True
+        mod._json_schema_to_python_type = safe_json_schema_to_python_type
+
+    orig_get_type = getattr(mod, "get_type", None)
+    if orig_get_type is not None and not getattr(orig_get_type, "_is_patched", False):
+        def safe_get_type(schema):
+            if isinstance(schema, bool):
+                return "Any" if schema else "None"
+            if not isinstance(schema, dict):
+                return "Any"
+            return orig_get_type(schema)
+        safe_get_type._is_patched = True
+        mod.get_type = safe_get_type
+
+
 def _hooked_import(name, *args, **kwargs):
-    mod = _original_import(name, *args, **kwargs)
+    if name == "torchaudio" or name.startswith("torchaudio."):
+        import sys
+        if name in sys.modules:
+            return sys.modules[name]
+        try:
+            return _original_import(name, *args, **kwargs)
+        except Exception:
+            from modules_forge import torchaudio_compat
+            torchaudio_compat.apply()
+            if name in sys.modules:
+                return sys.modules[name]
+            return torchaudio_compat._make_stub(name)
+
+    if name == "facexlib.version" or (name == "version" and args and isinstance(args[0], dict) and args[0].get("__package__") == "facexlib"):
+        import sys
+        if "facexlib.version" in sys.modules:
+            return sys.modules["facexlib.version"]
+        try:
+            return _original_import(name, *args, **kwargs)
+        except Exception:
+            import types
+            vmod = types.ModuleType("facexlib.version")
+            vmod.__version__ = "0.3.0"
+            vmod.__gitsha__ = "unknown"
+            sys.modules["facexlib.version"] = vmod
+            return vmod
+
+    try:
+        mod = _original_import(name, *args, **kwargs)
+    except ModuleNotFoundError as e:
+        if "facexlib.version" in str(e) or name in ("version", "facexlib.version"):
+            import sys
+            import types
+            vmod = types.ModuleType("facexlib.version")
+            vmod.__version__ = "0.3.0"
+            vmod.__gitsha__ = "unknown"
+            sys.modules["facexlib.version"] = vmod
+            return vmod
+        raise
 
     # HybridCache patch
     if name == "transformers":
@@ -129,6 +191,16 @@ def _hooked_import(name, *args, **kwargs):
     # diffusers flash_attn availability patch
     if name == "diffusers.utils.import_utils":
         _patch_diffusers_flash_attn_flag(mod)
+        if hasattr(mod, "is_torchaudio_available"):
+            mod.is_torchaudio_available = lambda: False
+
+    # transformers import_utils torchaudio flag patch
+    if name == "transformers.utils.import_utils":
+        mod.is_torchaudio_available = lambda: False
+
+    # gradio_client pydantic v2 boolean additionalProperties schema patch
+    if name == "gradio_client.utils":
+        _patch_gradio_client(mod)
 
     # numpy >= 2.4 compatibility: _blas_supports_fpe stub for scipy < 1.18
     if name in ("numpy._core._multiarray_umath", "numpy.core._multiarray_umath"):
@@ -141,6 +213,13 @@ def _hooked_import(name, *args, **kwargs):
 def apply():
     """Call before importing nunchaku / peft / diffusers; does not import transformers."""
     global _original_import
+
+    from modules_forge import torchaudio_compat
+    torchaudio_compat.apply()
+
+    import sys
+    if "gradio_client.utils" in sys.modules:
+        _patch_gradio_client(sys.modules["gradio_client.utils"])
 
     if _original_import is not None:
         return  # idempotent

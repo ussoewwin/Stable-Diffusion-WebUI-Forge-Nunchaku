@@ -133,7 +133,7 @@ def txt2img_image_conditioning(sd_model, x, width, height):
 
 @dataclass(repr=False)
 class StableDiffusionProcessing:
-    sd_model: object = None
+    sd_model: object = field(default=None, init=False)
     outpath_samples: str = None
     outpath_grids: str = None
     prompt: str = ""
@@ -273,11 +273,17 @@ class StableDiffusionProcessing:
 
     @property
     def sd_model(self):
-        return shared.sd_model
+        m = getattr(shared, "sd_model", None)
+        if isinstance(m, property) or m is None:
+            import modules.sd_models
+            return modules.sd_models.model_data.get_sd_model()
+        return m
 
     @sd_model.setter
     def sd_model(self, value):
-        pass
+        if value is not None and not isinstance(value, property):
+            import modules.sd_models
+            modules.sd_models.model_data.set_sd_model(value)
 
     @property
     def scripts(self):

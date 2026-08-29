@@ -1,6 +1,10 @@
 """ Credits to SmilingWolf """
 
-import tensorflow as tf
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
+
 try:
     import tensorflow_io as tfio  # pylint: disable=import-error
 except ImportError:

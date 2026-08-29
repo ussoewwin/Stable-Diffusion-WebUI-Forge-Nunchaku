@@ -258,11 +258,23 @@ class DeepDanbooruInterrogator(Interrogator):
                 'git+https://github.com/KichangKim/DeepDanbooru.'
                 'git@d91a2963bf87c6a770d74894667e9ffa9f6de7ff'
             )
+            try:
+                run_pip(
+                    f'install {package} tensorflow tensorflow-io', 'deepdanbooru')
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to install TensorFlow for DeepDanbooru: {e}. "
+                    "TensorFlow is not supported on Python 3.14+. "
+                    "Please use ONNX models (WD14 / MLDanbooru) instead."
+                )
 
-            run_pip(
-                f'install {package} tensorflow tensorflow-io', 'deepdanbooru')
-
-        import tensorflow as tf
+        try:
+            import tensorflow as tf
+        except ImportError:
+            raise RuntimeError(
+                "DeepDanbooru requires TensorFlow, which is not supported on Python 3.14+. "
+                "Please use ONNX models (WD14 / MLDanbooru) instead."
+            )
 
         # tensorflow maps nearly all vram by default, so we limit this
         # https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
@@ -344,7 +356,7 @@ def get_onnxrt():
         # https://onnxruntime.ai/docs/get-started/with-python.html#install-onnx-runtime
         # TODO: remove old package when the environment changes?
         from launch import is_installed, run_pip
-        if not is_installed('onnxruntime'):
+        if not is_installed('onnxruntime') and not is_installed('onnxruntime-gpu'):
             if system() == "Darwin":
                 package_name = "onnxruntime-silicon"
             else:
@@ -544,7 +556,13 @@ class WaifuDiffusionInterrogator(Interrogator):
         # Reduce logging
         # os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
-        import tensorflow as tf
+        try:
+            import tensorflow as tf
+        except ImportError:
+            raise RuntimeError(
+                "Large batch TensorFlow interrogation is unavailable because TensorFlow is not installed. "
+                "Please use standard ONNX interrogation."
+            )
 
         from tagger.generator.tf_data_reader import DataGenerator
 

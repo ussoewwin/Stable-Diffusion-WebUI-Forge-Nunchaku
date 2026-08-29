@@ -99,7 +99,7 @@ def _torch_version() -> tuple[str, str]:
 
     if m is None:
         print("\n\nFailed to parse PyTorch version...")
-        ver = os.environ.get("PYTORCH_VERSION", "2.11.0+cu130")
+        ver = os.environ.get("PYTORCH_VERSION", "2.13.0+cu132")
         print("Assuming: ", ver)
         print('(you can change this with `export PYTORCH_VERSION="..."`)\n\n')
         m = re.search(r"(\d+\.\d+\.\d+)(?:[^+]+)?\+(.+)", ver)
@@ -338,21 +338,23 @@ def requirements_met(requirements_file):
 
 
 def prepare_environment():
-    torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu130")
+    torch_index_url = os.environ.get("TORCH_INDEX_URL", "https://download.pytorch.org/whl/cu132")
     # Initial-install defaults only. Already-installed packages (including newer builds) are left alone.
-    torch_default = os.environ.get("TORCH_PACKAGE", "torch==2.11.0+cu130")
-    torchvision_default = os.environ.get("TORCHVISION_PACKAGE", "torchvision==0.26.0+cu130")
-    torchaudio_default = os.environ.get("TORCHAUDIO_PACKAGE", "torchaudio==2.11.0+cu130")
+    torch_default = os.environ.get("TORCH_PACKAGE", "torch")
+    torchvision_default = os.environ.get("TORCHVISION_PACKAGE", "torchvision")
     torch_command = os.environ.get(
         "TORCH_COMMAND",
-        f"pip install {torch_default} {torchvision_default} {torchaudio_default} --extra-index-url {torch_index_url}",
+        f"pip install {torch_default} {torchvision_default} --index-url {torch_index_url}",
     )
     xformers_package = os.environ.get("XFORMERS_PACKAGE", f"xformers==0.0.33.post2 --extra-index-url {torch_index_url}")
     bnb_package = os.environ.get("BNB_PACKAGE", "bitsandbytes==0.48.2")
 
     clip_package = os.environ.get("CLIP_PACKAGE", "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip")
     packaging_package = os.environ.get("PACKAGING_PACKAGE", "packaging==25.0")
-    gradio_package = os.environ.get("GRADIO_PACKAGE", "gradio==4.40.0 gradio_imageslider==0.0.20 gradio_rangeslider==0.0.8")
+    gradio_package = os.environ.get(
+        "GRADIO_PACKAGE",
+        "https://huggingface.co/ussoewwin/gradio/resolve/main/gradio-4.40.0-py3-none-any.whl gradio_imageslider==0.0.20 gradio_rangeslider==0.0.8",
+    )
     requirements_file = os.environ.get("REQS_FILE", "requirements.txt")
 
     try:
@@ -372,12 +374,12 @@ def prepare_environment():
     print(f"Python {sys.version}")
     print(f"Version: {tag}")
 
-    # Per-package: install default 2.11.0+cu130 stack only when missing.
-    # If torch / torchvision / torchaudio is already installed (including newer), do nothing to that package.
+    # Per-package: install default stack only when missing.
+    # If torch / torchvision is already installed (including newer), do nothing to that package.
     # --reinstall-torch forces the full default stack.
     if args.reinstall_torch:
         os.environ.pop("PIP_CONSTRAINT", None)
-        run(f'"{python}" -m {torch_command}', "Installing torch, torchvision and torchaudio", "Couldn't install torch", live=True)
+        run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
         startup_timer.record("install torch")
     else:
         torch_pkgs = []
@@ -385,12 +387,10 @@ def prepare_environment():
             torch_pkgs.append(torch_default)
         if not is_installed("torchvision"):
             torch_pkgs.append(torchvision_default)
-        if not is_installed("torchaudio"):
-            torch_pkgs.append(torchaudio_default)
         if torch_pkgs:
             os.environ.pop("PIP_CONSTRAINT", None)
             run(
-                f'"{python}" -m pip install {" ".join(torch_pkgs)} --extra-index-url {torch_index_url}',
+                f'"{python}" -m pip install {" ".join(torch_pkgs)} --index-url {torch_index_url}',
                 "Installing missing torch stack packages",
                 "Couldn't install torch stack",
                 live=True,
@@ -404,48 +404,100 @@ def prepare_environment():
         success, err = check_run_python("import torch; assert torch.cuda.is_available()", return_error=True)
         if not success:
             if "older driver" in str(err).lower():
-                raise SystemError("Please update your GPU driver to support cu130 ; or manually install older PyTorch")
+                raise SystemError("Please update your GPU driver to support cu132 ; or manually install older PyTorch")
             raise RuntimeError("PyTorch is not able to access CUDA")
         startup_timer.record("torch GPU test")
 
     if not is_installed("packaging"):
         run_pip(f"install {packaging_package}", "packaging")
 
+    distutils_package = os.environ.get(
+        "DISTUTILS_PACKAGE",
+        "https://huggingface.co/ussoewwin/distutils/resolve/main/distutils-3.14.0-py3-none-any.whl",
+    )
+    if not is_installed("distutils"):
+        try:
+            run_pip(f"install {distutils_package}", "distutils")
+        except RuntimeError:
+            print("Failed to install distutils; Please manually install it")
+        else:
+            startup_timer.record("install distutils")
+
     pyaudioop_package = os.environ.get("PYAUDIOOP_PACKAGE", "https://huggingface.co/ussoewwin/pyaudioop-1.0.0-py3-none-any/resolve/main/pyaudioop-1.0.0-py3-none-any.whl")
     if not is_installed("pyaudioop"):
         run_pip(f"install {pyaudioop_package}", "pyaudioop")
         startup_timer.record("install pyaudioop")
 
-    if os.name == "nt":
-        if not is_installed("insightface"):
-            run_pip("install insightface", "insightface")
-            startup_timer.record("install insightface")
+    if not is_installed("insightface"):
+        run_pip("install insightface", "insightface")
+        startup_timer.record("install insightface")
+
+    facexlib_package = os.environ.get(
+        "FACEXLIB_PACKAGE",
+        "https://huggingface.co/ussoewwin/facexlib/resolve/main/facexlib-0.3.0-py3-none-any.whl",
+    )
+    if not is_installed("facexlib"):
+        try:
+            run_pip(f"install {facexlib_package} --no-deps", "facexlib")
+        except RuntimeError:
+            print("Failed to install facexlib; Please manually install it")
+        else:
+            startup_timer.record("install facexlib")
 
     ver_PY = f"cp{sys.version_info.major}{sys.version_info.minor}"
     ver_SAGE = "2.2.0"
-    ver_FLASH = "2.8.3"
+    ver_FLASH = "2.8.4" if sys.version_info >= (3, 14) else "2.8.3"
     ver_TRITON = "3.5.1"
     ver_NUNCHAKU = "1.1.0"
     ver_TORCH, ver_CUDA = _torch_version()
     v_TORCH = ver_TORCH.rsplit(".", 1)[0]
 
     if os.name == "nt":
+        if sys.version_info >= (3, 14):
+            default_sage_package = "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattention-2.2.0.post6%2Bcu132torch2.13.0-cp314-cp314-win_amd64.whl"
+            default_sageattn3_package = "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattn3-1.0.0%2Bcu132torch2.13.0-cp314-cp314-win_amd64.whl"
+        else:
+            default_sage_package = "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattention-2.2.0%2Bcu130torch2.11.0-cp313-cp313-win_amd64.whl"
+            default_sageattn3_package = "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattn3-1.0.0%2Bcu130torch2.11.0-cp313-cp313-win_amd64.whl"
+
         sage_package = os.environ.get(
             "SAGE_PACKAGE",
-            "https://huggingface.co/ussoewwin/Sage-Attention-for-Windows/resolve/main/sageattention-2.2.0%2Bcu130torch2.11.0-cp313-cp313-win_amd64.whl",
+            default_sage_package,
         )
+        sageattn3_package = os.environ.get(
+            "SAGEATTN3_PACKAGE",
+            default_sageattn3_package,
+        )
+        if sys.version_info >= (3, 14):
+            default_flash_package = "https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.4%2Bcu132torch2.13.0cxx11abiTRUE-cp314-cp314-win_amd64.whl"
+        else:
+            default_flash_package = "https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.3%2Bcu130torch2.11.0cxx11abiTRUE-cp313-cp313-win_amd64.whl"
+
         flash_package = os.environ.get(
             "FLASH_PACKAGE",
-            "https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.3%2Bcu130torch2.11.0cxx11abiTRUE-cp313-cp313-win_amd64.whl",
+            default_flash_package,
         )
         triton_package = os.environ.get("TRITION_PACKAGE", "triton-windows")
-        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl")
+        if sys.version_info >= (3, 14):
+            default_nunchaku_package = "https://huggingface.co/ussoewwin/nunchaku-built-on-cu132/resolve/main/nunchaku-1.3.0.dev20260619%2Bcu13.2torch2.12-cp314-cp314-win_amd64.whl"
+        else:
+            default_nunchaku_package = f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-win_amd64.whl"
+
+        nunchaku_package = os.environ.get(
+            "NUNCHAKU_PACKAGE",
+            default_nunchaku_package,
+        )
 
     else:
         sage_package = os.environ.get("SAGE_PACKAGE", f"sageattention=={ver_SAGE}")
+        sageattn3_package = os.environ.get("SAGEATTN3_PACKAGE", None)
         flash_package = os.environ.get("FLASH_PACKAGE", f"https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.5.4/flash_attn-{ver_FLASH}+{ver_CUDA}torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
         triton_package = os.environ.get("TRITION_PACKAGE", f"triton=={ver_TRITON}")
-        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl")
+        if sys.version_info >= (3, 14):
+            default_nunchaku_linux = "https://huggingface.co/ussoewwin/nunchaku-built-on-cu132/resolve/main/nunchaku-1.3.0.dev20260829%2Bcu13.2torch2.13-cp314-cp314-linux_x86_64.whl"
+        else:
+            default_nunchaku_linux = f"https://github.com/nunchaku-tech/nunchaku/releases/download/v{ver_NUNCHAKU}/nunchaku-{ver_NUNCHAKU}+torch{v_TORCH}-{ver_PY}-{ver_PY}-linux_x86_64.whl"
+        nunchaku_package = os.environ.get("NUNCHAKU_PACKAGE", default_nunchaku_linux)
 
     def _verify_native_import(package: str) -> bool:
         """Verify a package can actually be imported (catches DLL / native extension failures)."""
@@ -514,6 +566,14 @@ def prepare_environment():
                 print("Failed to install sageattention; Please manually install it")
             else:
                 startup_timer.record("install sageattention")
+        if sageattn3_package and not _verify_native_import("sageattn3"):
+            _force_uninstall("sageattn3")
+            try:
+                run_pip(f"install --no-deps {sageattn3_package}", "sageattn3")
+            except RuntimeError:
+                print("Failed to install sageattn3; Please manually install it")
+            else:
+                startup_timer.record("install sageattn3")
 
     if args.flash and not _verify_native_import("flash_attn"):
         _force_uninstall("flash_attn")

@@ -255,9 +255,13 @@ class SdModelData:
         self.forge_hash = ""
 
     def get_sd_model(self):
+        if isinstance(self.sd_model, property):
+            return None
         return self.sd_model
 
     def set_sd_model(self, v):
+        if isinstance(v, property):
+            return
         self.sd_model = v
 
 
@@ -319,12 +323,15 @@ def forge_model_reload():
 
     timer = Timer()
 
-    if model_data.sd_model is not None:
-        if not isinstance(model_data.sd_model, FakeInitialModel):
-            model_data.sd_model.forge_objects.unet.model.cleanup()
-            del model_data.sd_model.forge_objects.clip.tokenizer
-            del model_data.sd_model.forge_objects.clip.cond_stage_model
-            del model_data.sd_model.forge_objects.vae.first_stage_model
+    if model_data.sd_model is not None and not isinstance(model_data.sd_model, (FakeInitialModel, property)):
+        if hasattr(model_data.sd_model, "forge_objects") and hasattr(model_data.sd_model.forge_objects, "unet"):
+            try:
+                model_data.sd_model.forge_objects.unet.model.cleanup()
+                del model_data.sd_model.forge_objects.clip.tokenizer
+                del model_data.sd_model.forge_objects.clip.cond_stage_model
+                del model_data.sd_model.forge_objects.vae.first_stage_model
+            except Exception:
+                pass
 
         memory_management.unload_all_models()
 

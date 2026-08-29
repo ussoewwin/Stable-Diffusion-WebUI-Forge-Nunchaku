@@ -13,6 +13,9 @@ def initialize_forge():
 
     INITIALIZED = True
 
+    from modules_forge import torchaudio_compat
+    torchaudio_compat.apply()
+
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules_forge", "packages"))
 
     from backend.args import args
