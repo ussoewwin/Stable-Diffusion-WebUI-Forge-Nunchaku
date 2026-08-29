@@ -7,7 +7,7 @@
   </tr>
 </table>
 
-⚠️ **This project requires Python 3.13 exclusively.**
+⚠️ **This project requires Python 3.14 exclusively.**
 
 <p align="center">
   <img src="png/top.png" alt="Stable Diffusion WebUI Forge - Nunchaku" width="400">
@@ -127,13 +127,13 @@
   - Fixed double patching and stale patches issues causing RecursionError
 
 - **Built-in ADetailer**
-  - Python 3.13 compatible face detection and enhancement
+  - Python 3.14 compatible face detection and enhancement
   - YOLOv8, YOLOv11, and InsightFace hybrid detection system
   - Enhanced face detection accuracy with complementary detection
   - Automatic model download and management
   - SDXL/Pony optimized detection thresholds
 
-- **Python 3.13 Exclusive**
+- **Python 3.14 Exclusive**
   - Latest Python features and performance improvements
   - Optimized for modern hardware and workflows
   - Future-proof architecture

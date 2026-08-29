@@ -7,7 +7,7 @@
   </tr>
 </table>
 
-⚠️ **本项目仅支持 Python 3.13。**
+⚠️ **本项目仅支持 Python 3.14。**
 
 <p align="center">
   <img src="../png/top.png" alt="Stable Diffusion WebUI Forge - Nunchaku" width="400">
@@ -127,13 +127,13 @@
   - 修复导致 RecursionError 的双重补丁和过期补丁问题
 
 - **内置 ADetailer**
-  - 兼容 Python 3.13 的人脸检测与增强
+  - 兼容 Python 3.14 的人脸检测与增强
   - YOLOv8、YOLOv11 和 InsightFace 混合检测系统
   - 互补检测提升人脸检测精度
   - 自动模型下载与管理
   - 针对 SDXL/Pony 优化的检测阈值
 
-- **仅支持 Python 3.13**
+- **仅支持 Python 3.14**
   - 最新 Python 特性与性能改进
   - 针对现代硬件与工作流优化
   - 面向未来的架构
